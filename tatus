@@ -1,0 +1,5 @@
+[33mc4c2cee[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m, [m[1;31morigin/main[m[33m, [m[1;31morigin/HEAD[m[33m)[m Fix Vercel deployment configuration - simplify vercel.json and resolve Function Runtimes error
+[33m370a9a7[m error web vita fixed
+[33mf41f5d0[m vercel update
+[33m6e702da[m Delete Folder 00
+[33m53a4a4a[m Fix Vercel runtime configuration error

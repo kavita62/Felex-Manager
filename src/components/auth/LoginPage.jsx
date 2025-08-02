@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Eye, EyeOff, Mail, Lock, Github, Chrome } from 'lucide-react';
+import { Eye, EyeOff, Mail, Lock, Github, Chrome, Sparkles, Heart } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 
 const LoginPage = ({ onLoginSuccess }) => {
@@ -65,6 +65,35 @@ const LoginPage = ({ onLoginSuccess }) => {
     return (
         <div className="min-h-screen bg-gradient-to-br from-gray-900 via-gray-800 to-indigo-900 flex items-center justify-center p-4">
             <div className="max-w-md w-full space-y-8">
+                {/* Widget de Boas-vindas para Kavita */}
+                <div className="bg-gradient-to-r from-pink-500/20 to-purple-500/20 backdrop-blur-sm rounded-2xl p-6 border border-pink-500/30 shadow-2xl animate-pulse">
+                    <div className="flex items-center justify-center mb-4">
+                        <div className="relative">
+                            <div className="w-16 h-16 bg-gradient-to-r from-pink-400 to-purple-400 rounded-full flex items-center justify-center">
+                                <Sparkles size={32} className="text-white" />
+                            </div>
+                            <div className="absolute -top-1 -right-1">
+                                <Heart size={20} className="text-red-400 animate-bounce" />
+                            </div>
+                        </div>
+                    </div>
+                    <div className="text-center">
+                        <h1 className="text-2xl font-bold text-white mb-2">
+                            Olá, Kavita! 👋
+                        </h1>
+                        <p className="text-pink-200 text-sm leading-relaxed">
+                            Bem-vinda ao seu <span className="font-semibold text-purple-300">Felex Manager</span>! 
+                            <br />
+                            Estamos aqui para tornar sua gestão de conteúdo mais fácil e eficiente.
+                        </p>
+                        <div className="mt-3 flex items-center justify-center space-x-2">
+                            <div className="w-2 h-2 bg-pink-400 rounded-full animate-pulse"></div>
+                            <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse" style={{animationDelay: '0.2s'}}></div>
+                            <div className="w-2 h-2 bg-indigo-400 rounded-full animate-pulse" style={{animationDelay: '0.4s'}}></div>
+                        </div>
+                    </div>
+                </div>
+
                 {/* Logo and Title */}
                 <div className="text-center">
                     <div className="mx-auto h-16 w-16 bg-indigo-600 rounded-full flex items-center justify-center mb-4">

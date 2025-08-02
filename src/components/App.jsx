@@ -9,7 +9,6 @@ import ContentSection from './sections/ContentSection';
 import { initialAgents, initialRules } from '../data/mockData';
 import { useAuth } from '../contexts/AuthContext';
 import LoginPage from './auth/LoginPage';
-import DemoLoginPage from './auth/DemoLoginPage';
 
 // --- CONTEÚDO PRINCIPAL ---
 const MainContent = ({ section, agents, setAgents, rules, setRules }) => {
@@ -91,19 +90,9 @@ export default function App() {
         );
     }
 
-    // Show login page if not authenticated (even if there are errors)
+    // Show login page if not authenticated
     if (!isAuthenticated) {
-        // Check if Supabase is configured
-        const isSupabaseConfigured = import.meta.env.VITE_SUPABASE_URL && import.meta.env.VITE_SUPABASE_ANON_KEY;
-        
-        if (isSupabaseConfigured) {
-            return <LoginPage />;
-        } else {
-            return <DemoLoginPage onLoginSuccess={(user) => {
-                // The demo login will handle setting the user in localStorage
-                // and the AuthContext will pick it up automatically
-            }} />;
-        }
+        return <LoginPage />;
     }
 
     // Show main app if authenticated

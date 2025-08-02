@@ -1,5 +1,5 @@
 import React from 'react';
-import { Home, MessageSquare, LayoutTemplate, Calendar, Bot, BarChart2, Settings } from 'lucide-react';
+import { Home, MessageSquare, LayoutTemplate, Calendar, Bot, BarChart2, Settings, Warehouse } from 'lucide-react';
 import { NavItem } from './CommonComponents';
 
 const Sidebar = ({ activeSection, setActiveSection }) => {
@@ -9,6 +9,7 @@ const Sidebar = ({ activeSection, setActiveSection }) => {
         { id: 'conteudo', label: 'Conteúdo', icon: <LayoutTemplate size={22} /> },
         { id: 'calendario', label: 'Calendário', icon: <Calendar size={22} /> },
         { id: 'automacao', label: 'AI Studio', icon: <Bot size={22} /> },
+        { id: 'warehouse', label: 'AI Warehouse', icon: <Warehouse size={22} /> },
         { id: 'analises', label: 'Análises', icon: <BarChart2 size={22} /> },
     ];
 

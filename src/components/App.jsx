@@ -6,6 +6,7 @@ import { SectionPlaceholder } from './ui/CommonComponents';
 import AiStudioSection from './sections/AiStudioSection';
 import CalendarSection from './sections/CalendarSection';
 import ContentSection from './sections/ContentSection';
+import WarehouseSection from './sections/WarehouseSection';
 import { initialAgents, initialRules } from '../data/mockData';
 import { useAuth } from '../contexts/AuthContext';
 import LoginPage from './auth/LoginPage';
@@ -41,6 +42,10 @@ const MainContent = ({ section, agents, setAgents, rules, setRules }) => {
             title: 'AI Studio',
             component: <AiStudioSection agents={agents} setAgents={setAgents} rules={rules} setRules={setRules} />
         },
+        warehouse: {
+            title: 'AI Warehouse',
+            component: <WarehouseSection />
+        },
         analises: {
             title: 'Análises de Desempenho',
             component: <SectionPlaceholder
@@ -73,7 +78,7 @@ const MainContent = ({ section, agents, setAgents, rules, setRules }) => {
 
 // --- COMPONENTE APP PRINCIPAL ---
 export default function App() {
-    const [activeSection, setActiveSection] = useState('automacao');
+    const [activeSection, setActiveSection] = useState('warehouse');
     const [agents, setAgents] = useState(initialAgents);
     const [rules, setRules] = useState(initialRules);
     const { user, loading, isAuthenticated, error } = useAuth();

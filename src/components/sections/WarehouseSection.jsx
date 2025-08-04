@@ -19,6 +19,7 @@ import {
     X
 } from 'lucide-react';
 import ReactFlow, { ReactFlowProvider } from "reactflow";
+import WarehouseViewport from '../warehouse/Warehouse';
 
 const WarehouseSection = () => {
     const [agents, setAgents] = useState([
@@ -75,6 +76,7 @@ const WarehouseSection = () => {
     const [selectedAgent, setSelectedAgent] = useState(null);
     const [showAgentOffice, setShowAgentOffice] = useState(false);
     const [showViewport, setShowViewport] = useState(false);
+    const [showAdvancedViewport, setShowAdvancedViewport] = useState(false);
 
     const getStatusColor = (status) => {
         switch (status) {
@@ -248,6 +250,13 @@ const WarehouseSection = () => {
                          <Warehouse size={20} />
                          <span>{showViewport ? 'Ver Grid' : 'Ver Viewport'}</span>
                      </button>
+                     <button 
+                         onClick={() => setShowAdvancedViewport(!showAdvancedViewport)}
+                         className="flex items-center space-x-2 bg-green-600 hover:bg-green-700 px-4 py-2 rounded-lg transition-colors"
+                     >
+                         <Brain size={20} />
+                         <span>{showAdvancedViewport ? 'Ver Grid' : 'Ver Advanced Viewport'}</span>
+                     </button>
                      <button className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg transition-colors">
                          <Plus size={20} />
                          <span>Novo Agente</span>
@@ -304,7 +313,11 @@ const WarehouseSection = () => {
             </div>
 
                          {/* Agents Grid or Viewport */}
-             {showViewport ? (
+             {showAdvancedViewport ? (
+                 <div className="h-screen bg-gray-900 rounded-lg overflow-hidden">
+                     <WarehouseViewport />
+                 </div>
+             ) : showViewport ? (
                  <div className="h-96 bg-gray-800 rounded-lg overflow-hidden">
                      <AIWarehouseViewport />
                  </div>

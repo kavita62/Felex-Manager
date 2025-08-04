@@ -78,7 +78,8 @@ export default function Warehouse() {
       sourcePin: 0,
       targetPin: 0,
       sourceType: 'trigger',
-      targetType: 'trigger'
+      targetType: 'trigger',
+      flowType: 'exec'
     },
     { 
       id: 2, 
@@ -87,7 +88,8 @@ export default function Warehouse() {
       sourcePin: 0,
       targetPin: 0,
       sourceType: 'text',
-      targetType: 'text'
+      targetType: 'text',
+      flowType: 'data'
     }
   ]);
   
@@ -252,17 +254,29 @@ export default function Warehouse() {
     setPan({ x: 100, y: 50 });
   };
 
-  const getConnectionColor = (sourceType) => {
-    switch (sourceType) {
-      case 'trigger': return '#f97316'; // orange
-      case 'data': return '#3b82f6'; // blue
-      case 'text': return '#a855f7'; // purple
-      case 'image': return '#ec4899'; // pink
-      case 'video': return '#ef4444'; // red
-      case 'status': return '#22c55e'; // green
-      case 'result': return '#eab308'; // yellow
-      case 'approval': return '#06b6d4'; // cyan
-      default: return '#6b7280'; // gray
+  const getConnectionStyle = (flowType, sourceType) => {
+    if (flowType === 'exec') {
+      return {
+        stroke: '#ffffff',
+        strokeWidth: 2,
+        strokeDasharray: '5,5'
+      };
+    } else {
+      const colorMap = {
+        'trigger': '#f97316',
+        'data': '#3b82f6',
+        'text': '#a855f7',
+        'image': '#ec4899',
+        'video': '#ef4444',
+        'status': '#22c55e',
+        'result': '#eab308',
+        'approval': '#06b6d4'
+      };
+      return {
+        stroke: colorMap[sourceType] || '#6b7280',
+        strokeWidth: 3,
+        strokeDasharray: 'none'
+      };
     }
   };
 
@@ -300,11 +314,6 @@ export default function Warehouse() {
           
           {/* Render Connections */}
           <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 500 }}>
-            <defs>
-              <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                <polygon points="0 0, 10 3.5, 0 7" fill="currentColor" />
-              </marker>
-            </defs>
             {connections.map(connection => {
               const sourceAgent = agents.find(a => a.id === connection.source);
               const targetAgent = agents.find(a => a.id === connection.target);
@@ -322,19 +331,20 @@ export default function Warehouse() {
               const controlPoint2X = endX - 100;
               const controlPoint2Y = endY;
               
-              const connectionColor = getConnectionColor(connection.sourceType);
+              const connectionStyle = getConnectionStyle(connection.flowType, connection.sourceType);
               
               return (
                 <g key={connection.id}>
                   <defs>
                     <marker id={`arrowhead-${connection.id}`} markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                      <polygon points="0 0, 10 3.5, 0 7" fill={connectionColor} />
+                      <polygon points="0 0, 10 3.5, 0 7" fill={connectionStyle.stroke} />
                     </marker>
                   </defs>
                   <path
                     d={`M ${startX} ${startY} C ${controlPoint1X} ${controlPoint1Y}, ${controlPoint2X} ${controlPoint2Y}, ${endX} ${endY}`}
-                    stroke={connectionColor}
-                    strokeWidth="3"
+                    stroke={connectionStyle.stroke}
+                    strokeWidth={connectionStyle.strokeWidth}
+                    strokeDasharray={connectionStyle.strokeDasharray}
                     fill="none"
                     markerEnd={`url(#arrowhead-${connection.id})`}
                     className="drop-shadow-lg"

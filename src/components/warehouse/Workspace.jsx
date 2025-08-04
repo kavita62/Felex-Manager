@@ -32,14 +32,16 @@ const NODE_TYPES = {
     color: 'bg-blue-500', 
     inputs: 0, 
     outputs: 1,
-    outputTypes: ['trigger']
+    outputTypes: ['trigger'],
+    flowType: 'exec'
   },
   'on-schedule': { 
     icon: Calendar, 
     color: 'bg-indigo-500', 
     inputs: 0, 
     outputs: 1,
-    outputTypes: ['trigger']
+    outputTypes: ['trigger'],
+    flowType: 'exec'
   },
   'check-status': { 
     icon: Search, 
@@ -47,7 +49,8 @@ const NODE_TYPES = {
     inputs: 1, 
     outputs: 1,
     inputTypes: ['trigger', 'data'],
-    outputTypes: ['status']
+    outputTypes: ['status'],
+    flowType: 'data'
   },
   'automate-task': { 
     icon: Zap, 
@@ -55,7 +58,8 @@ const NODE_TYPES = {
     inputs: 1, 
     outputs: 1,
     inputTypes: ['trigger', 'data'],
-    outputTypes: ['result']
+    outputTypes: ['result'],
+    flowType: 'exec'
   },
   'generate-text': { 
     icon: FileText, 
@@ -63,7 +67,8 @@ const NODE_TYPES = {
     inputs: 1, 
     outputs: 1,
     inputTypes: ['trigger', 'data'],
-    outputTypes: ['text']
+    outputTypes: ['text'],
+    flowType: 'data'
   },
   'generate-image': { 
     icon: Image, 
@@ -71,7 +76,8 @@ const NODE_TYPES = {
     inputs: 1, 
     outputs: 1,
     inputTypes: ['trigger', 'data'],
-    outputTypes: ['image']
+    outputTypes: ['image'],
+    flowType: 'data'
   },
   'generate-video': { 
     icon: Video, 
@@ -79,7 +85,8 @@ const NODE_TYPES = {
     inputs: 1, 
     outputs: 1,
     inputTypes: ['trigger', 'data'],
-    outputTypes: ['video']
+    outputTypes: ['video'],
+    flowType: 'data'
   },
   'send-for-approval': { 
     icon: UserCheck, 
@@ -87,21 +94,24 @@ const NODE_TYPES = {
     inputs: 1, 
     outputs: 1,
     inputTypes: ['trigger', 'data', 'text', 'image', 'video'],
-    outputTypes: ['approval']
+    outputTypes: ['approval'],
+    flowType: 'exec'
   },
   'check-memory': { 
     icon: Database, 
     color: 'bg-teal-500', 
     inputs: 0, 
     outputs: 1,
-    outputTypes: ['data']
+    outputTypes: ['data'],
+    flowType: 'data'
   },
   'check-task-list': { 
     icon: List, 
     color: 'bg-gray-500', 
     inputs: 0, 
     outputs: 1,
-    outputTypes: ['data']
+    outputTypes: ['data'],
+    flowType: 'data'
   }
 };
 
@@ -110,6 +120,8 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
   const [draggedPin, setDraggedPin] = useState(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [isDraggingConnection, setIsDraggingConnection] = useState(false);
+  const [hoveredPin, setHoveredPin] = useState(null);
+  const [connectionError, setConnectionError] = useState(null);
   const workspaceRef = useRef(null);
 
   const getStatusIcon = (status) => {
@@ -146,6 +158,34 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
     }
   };
 
+  const isCompatibleConnection = (sourceType, targetType, sourceIsOutput, targetIsOutput) => {
+    // Prevent invalid connections
+    if (sourceIsOutput === targetIsOutput) return false; // Can't connect output->output or input->input
+    if (!sourceIsOutput) return false; // Can only start from output
+    
+    // Check type compatibility
+    if (sourceType === targetType) return true;
+    if (targetType === 'data') return true; // Data accepts any type
+    if (sourceType === 'trigger') return true; // Trigger can start any flow
+    
+    return false;
+  };
+
+  const getConnectionStyle = (flowType, dataType) => {
+    if (flowType === 'exec') {
+      return {
+        stroke: '#ffffff',
+        strokeWidth: 2,
+        strokeDasharray: '5,5'
+      };
+    } else {
+      return {
+        stroke: getPinColor(dataType).replace('bg-', '#'),
+        strokeWidth: 3
+      };
+    }
+  };
+
   const handleNodeMouseDown = (e, node) => {
     e.stopPropagation();
     setDraggedNode(node);
@@ -166,6 +206,7 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
     if (isDraggingConnection) {
       setIsDraggingConnection(false);
       setDraggedPin(null);
+      setConnectionError(null);
     }
   };
 
@@ -173,6 +214,7 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
     e.stopPropagation();
     setIsDraggingConnection(true);
     setDraggedPin({ nodeId, pinType, pinIndex, isOutput });
+    setConnectionError(null);
   };
 
   const handlePinMouseUp = (e, targetNodeId, targetPinType, targetPinIndex, targetIsOutput) => {
@@ -187,29 +229,62 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
         const sourceNodeType = NODE_TYPES[sourceNode.type];
         const targetNodeType = NODE_TYPES[targetNode.type];
         
-        // Only allow output to input connections
-        if (draggedPin.isOutput && !targetIsOutput) {
-          const sourceOutputType = sourceNodeType.outputTypes[draggedPin.pinIndex];
-          const targetInputType = targetNodeType.inputTypes[targetPinIndex];
-          
-          // Check if types are compatible
-          if (sourceOutputType && targetInputType && 
-              (sourceOutputType === targetInputType || 
-               targetInputType === 'data' || 
-               sourceOutputType === 'trigger')) {
-            onNodeConnect(draggedPin.nodeId, targetNodeId, {
-              sourcePin: draggedPin.pinIndex,
-              targetPin: targetPinIndex,
-              sourceType: sourceOutputType,
-              targetType: targetInputType
-            });
-          }
+        const sourceOutputType = sourceNodeType.outputTypes[draggedPin.pinIndex];
+        const targetInputType = targetNodeType.inputTypes[targetPinIndex];
+        
+        const isValid = isCompatibleConnection(
+          sourceOutputType, 
+          targetInputType, 
+          draggedPin.isOutput, 
+          targetIsOutput
+        );
+        
+        if (isValid) {
+          onNodeConnect(draggedPin.nodeId, targetNodeId, {
+            sourcePin: draggedPin.pinIndex,
+            targetPin: targetPinIndex,
+            sourceType: sourceOutputType,
+            targetType: targetInputType,
+            flowType: sourceNodeType.flowType
+          });
+          setConnectionError(null);
+        } else {
+          setConnectionError('Invalid connection: Incompatible types or invalid pin combination');
+          setTimeout(() => setConnectionError(null), 3000);
         }
       }
     }
     
     setIsDraggingConnection(false);
     setDraggedPin(null);
+  };
+
+  const handlePinMouseEnter = (nodeId, pinType, pinIndex, isOutput) => {
+    if (isDraggingConnection && draggedPin) {
+      const sourceNode = agents.find(a => a.id === draggedPin.nodeId);
+      const targetNode = agents.find(a => a.id === nodeId);
+      
+      if (sourceNode && targetNode) {
+        const sourceNodeType = NODE_TYPES[sourceNode.type];
+        const targetNodeType = NODE_TYPES[targetNode.type];
+        
+        const sourceOutputType = sourceNodeType.outputTypes[draggedPin.pinIndex];
+        const targetInputType = targetNodeType.inputTypes[pinIndex];
+        
+        const isValid = isCompatibleConnection(
+          sourceOutputType, 
+          targetInputType, 
+          draggedPin.isOutput, 
+          isOutput
+        );
+        
+        setHoveredPin({ nodeId, pinType, pinIndex, isOutput, isValid });
+      }
+    }
+  };
+
+  const handlePinMouseLeave = () => {
+    setHoveredPin(null);
   };
 
   const renderConnectionLine = () => {
@@ -219,7 +294,7 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
     if (!sourceNode) return null;
 
     const nodeType = NODE_TYPES[sourceNode.type];
-    const startX = sourceNode.position.x + 220; // Output position
+    const startX = sourceNode.position.x + 220;
     const startY = sourceNode.position.y + 60 + (draggedPin.pinIndex * 20);
     const endX = mousePos.x;
     const endY = mousePos.y;
@@ -230,17 +305,21 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
     const controlPoint2X = endX - 100;
     const controlPoint2Y = endY;
 
+    const connectionStyle = getConnectionStyle(nodeType.flowType, draggedPin.pinType);
+    const strokeColor = hoveredPin && !hoveredPin.isValid ? '#ef4444' : connectionStyle.stroke;
+
     return (
       <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 1000 }}>
         <defs>
           <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-            <polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6" />
+            <polygon points="0 0, 10 3.5, 0 7" fill={strokeColor} />
           </marker>
         </defs>
         <path
           d={`M ${startX} ${startY} C ${controlPoint1X} ${controlPoint1Y}, ${controlPoint2X} ${controlPoint2Y}, ${endX} ${endY}`}
-          stroke="#3b82f6"
-          strokeWidth="2"
+          stroke={strokeColor}
+          strokeWidth={connectionStyle.strokeWidth}
+          strokeDasharray={connectionStyle.strokeDasharray}
           fill="none"
           markerEnd="url(#arrowhead)"
         />
@@ -318,13 +397,20 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
         <div className="absolute left-0 top-0 bottom-0 flex flex-col justify-center space-y-2 pointer-events-none">
           {Array.from({ length: nodeType.inputs }, (_, i) => {
             const inputType = nodeType.inputTypes[i];
+            const isHovered = hoveredPin && hoveredPin.nodeId === agent.id && hoveredPin.pinIndex === i && !hoveredPin.isOutput;
+            const isValidTarget = hoveredPin && hoveredPin.isValid;
+            
             return (
               <div
                 key={`input-${i}`}
-                className={`w-3 h-3 ${getPinColor(inputType)} border border-white rounded-full cursor-pointer pointer-events-auto hover:scale-125 transition-transform`}
+                className={`w-3 h-3 ${getPinColor(inputType)} border-2 rounded-full cursor-pointer pointer-events-auto hover:scale-125 transition-transform ${
+                  isHovered ? (isValidTarget ? 'border-green-400 scale-150' : 'border-red-400 scale-150') : 'border-white'
+                }`}
                 style={{ top: `${30 + i * 20}%` }}
                 onMouseDown={(e) => handlePinMouseDown(e, agent.id, inputType, i, false)}
                 onMouseUp={(e) => handlePinMouseUp(e, agent.id, inputType, i, false)}
+                onMouseEnter={() => handlePinMouseEnter(agent.id, inputType, i, false)}
+                onMouseLeave={handlePinMouseLeave}
                 title={`Input: ${inputType}`}
               />
             );
@@ -335,13 +421,19 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
         <div className="absolute right-0 top-0 bottom-0 flex flex-col justify-center space-y-2 pointer-events-none">
           {Array.from({ length: nodeType.outputs }, (_, i) => {
             const outputType = nodeType.outputTypes[i];
+            const isHovered = hoveredPin && hoveredPin.nodeId === agent.id && hoveredPin.pinIndex === i && hoveredPin.isOutput;
+            
             return (
               <div
                 key={`output-${i}`}
-                className={`w-3 h-3 ${getPinColor(outputType)} border border-white rounded-full cursor-pointer pointer-events-auto hover:scale-125 transition-transform`}
+                className={`w-3 h-3 ${getPinColor(outputType)} border-2 rounded-full cursor-pointer pointer-events-auto hover:scale-125 transition-transform ${
+                  isHovered ? 'border-green-400 scale-150' : 'border-white'
+                }`}
                 style={{ top: `${30 + i * 20}%` }}
                 onMouseDown={(e) => handlePinMouseDown(e, agent.id, outputType, i, true)}
                 onMouseUp={(e) => handlePinMouseUp(e, agent.id, outputType, i, true)}
+                onMouseEnter={() => handlePinMouseEnter(agent.id, outputType, i, true)}
+                onMouseLeave={handlePinMouseLeave}
                 title={`Output: ${outputType}`}
               />
             );
@@ -368,6 +460,13 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
 
       {/* Connection Lines */}
       {renderConnectionLine()}
+
+      {/* Error Message */}
+      {connectionError && (
+        <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50">
+          {connectionError}
+        </div>
+      )}
 
       {/* Nodes */}
       {agents.map((agent) => renderNode(agent))}

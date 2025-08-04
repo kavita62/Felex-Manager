@@ -154,8 +154,35 @@ export default function Warehouse() {
     const nodeName = event.dataTransfer.getData('application/node-name');
 
     if (nodeType) {
-      console.log(`Dropped node "${nodeName}" of type "${nodeType}"`);
-      alert(`Agente "${nodeName}" adicionado ao workspace!`);
+      // Crie um novo ID único
+      const newId = Date.now();
+      // Posição baseada no local do drop
+      const rect = workspaceRef.current.getBoundingClientRect();
+      const x = (event.clientX - rect.left - pan.x) / zoom;
+      const y = (event.clientY - rect.top - pan.y) / zoom;
+
+      // Crie o novo agente
+      const newAgent = {
+        id: newId,
+        name: nodeName,
+        type: nodeType,
+        status: 'idle',
+        progress: 0,
+        task: '',
+        memory: 'Medium',
+        rules: [],
+        lastActivity: 'agora',
+        performance: 80,
+        is_active: true,
+        created_at: new Date().toISOString(),
+        position: { x, y }
+      };
+
+      setAgents(prev => [...prev, newAgent]);
+      setTasks(prev => ({
+        ...prev,
+        [newId]: []
+      }));
     }
   };
 

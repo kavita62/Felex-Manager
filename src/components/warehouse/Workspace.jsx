@@ -63,7 +63,7 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
 
       {/* Agents */}
       {agents.map((agent, index) => {
-        const position = getAgentPosition(index);
+        const position = agent.position || getAgentPosition(index);
         const agentTasks = tasks[agent.id] || [];
         const activeTasks = agentTasks.filter(task => task.status === 'running' || task.status === 'processing');
         

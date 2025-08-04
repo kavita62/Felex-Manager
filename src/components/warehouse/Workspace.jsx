@@ -115,7 +115,7 @@ const NODE_TYPES = {
   }
 };
 
-export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, onAgentClick, onNodeMove, onNodeConnect, onNodeDelete, selectedNode, onNodeSelect }) {
+export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, onAgentClick, onNodeMove, onNodeConnect, onNodeDelete, selectedNode, onNodeSelect, connections }) {
   const [draggedNode, setDraggedNode] = useState(null);
   const [draggedPin, setDraggedPin] = useState(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
@@ -123,6 +123,7 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
   const [hoveredPin, setHoveredPin] = useState(null);
   const [connectionError, setConnectionError] = useState(null);
   const [autoConnectTarget, setAutoConnectTarget] = useState(null);
+  const [activeConnections, setActiveConnections] = useState(new Set());
   const workspaceRef = useRef(null);
 
   // Handle keyboard events
@@ -136,6 +137,29 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
   }, [selectedNode, onNodeDelete]);
+
+  // Simulate active connections
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (connections.length > 0) {
+        const randomConnection = connections[Math.floor(Math.random() * connections.length)];
+        setActiveConnections(prev => {
+          const newSet = new Set(prev);
+          newSet.add(randomConnection.id);
+          setTimeout(() => {
+            setActiveConnections(current => {
+              const updated = new Set(current);
+              updated.delete(randomConnection.id);
+              return updated;
+            });
+          }, 1000);
+          return newSet;
+        });
+      }
+    }, 3000);
+
+    return () => clearInterval(interval);
+  }, [connections]);
 
   const getStatusIcon = (status) => {
     switch (status) {
@@ -380,6 +404,75 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
     );
   };
 
+  const renderExistingConnections = () => {
+    return connections.map(connection => {
+      const sourceAgent = agents.find(a => a.id === connection.source);
+      const targetAgent = agents.find(a => a.id === connection.target);
+      
+      if (!sourceAgent || !targetAgent) return null;
+      
+      const startX = sourceAgent.position.x + 220;
+      const startY = sourceAgent.position.y + 60 + (connection.sourcePin * 20);
+      const endX = targetAgent.position.x;
+      const endY = targetAgent.position.y + 60 + (connection.targetPin * 20);
+      
+      // Calculate control points for Bezier curve
+      const controlPoint1X = startX + 100;
+      const controlPoint1Y = startY;
+      const controlPoint2X = endX - 100;
+      const controlPoint2Y = endY;
+      
+      const connectionStyle = getConnectionStyle(connection.flowType, connection.sourceType);
+      const isActive = activeConnections.has(connection.id);
+      
+      return (
+        <g key={connection.id}>
+          <defs>
+            <marker id={`arrowhead-${connection.id}`} markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill={connectionStyle.stroke} />
+            </marker>
+          </defs>
+          {/* Main connection line */}
+          <path
+            d={`M ${startX} ${startY} C ${controlPoint1X} ${controlPoint1Y}, ${controlPoint2X} ${controlPoint2Y}, ${endX} ${endY}`}
+            stroke={connectionStyle.stroke}
+            strokeWidth={connectionStyle.strokeWidth}
+            strokeDasharray={connectionStyle.strokeDasharray}
+            fill="none"
+            markerEnd={`url(#arrowhead-${connection.id})`}
+            className="drop-shadow-lg"
+          />
+          {/* Active connection indicator */}
+          {isActive && (
+            <path
+              d={`M ${startX} ${startY} C ${controlPoint1X} ${controlPoint1Y}, ${controlPoint2X} ${controlPoint2Y}, ${endX} ${endY}`}
+              stroke="#ffffff"
+              strokeWidth="4"
+              strokeDasharray="5,5"
+              fill="none"
+              className="animate-pulse"
+            />
+          )}
+          {/* Connection points */}
+          <circle
+            cx={startX}
+            cy={startY}
+            r="4"
+            fill={connectionStyle.stroke}
+            className="drop-shadow-md"
+          />
+          <circle
+            cx={endX}
+            cy={endY}
+            r="4"
+            fill={connectionStyle.stroke}
+            className="drop-shadow-md"
+          />
+        </g>
+      );
+    });
+  };
+
   const renderNode = (agent) => {
     const nodeType = NODE_TYPES[agent.type] || { icon: Brain, color: 'bg-gray-500', inputs: 0, outputs: 1 };
     const IconComponent = nodeType.icon;
@@ -387,6 +480,10 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
     const activeTasks = agentTasks.filter(task => task.status === 'running' || task.status === 'processing');
     const isSelected = selectedNode && selectedNode.id === agent.id;
     const isAutoConnectTarget = autoConnectTarget && autoConnectTarget.id === agent.id;
+
+    // Check if this node has connections
+    const hasInputConnections = connections.some(conn => conn.target === agent.id);
+    const hasOutputConnections = connections.some(conn => conn.source === agent.id);
 
     return (
       <motion.div
@@ -397,6 +494,8 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
           isSelected ? 'border-yellow-400 shadow-lg shadow-yellow-400/50' : 'border-slate-700'
         } ${
           isAutoConnectTarget ? 'ring-2 ring-green-400 ring-opacity-50' : ''
+        } ${
+          hasInputConnections || hasOutputConnections ? 'ring-1 ring-blue-400 ring-opacity-30' : ''
         }`}
         style={{
           left: agent.position.x,
@@ -454,6 +553,15 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
           </div>
         </div>
 
+        {/* Connection indicators */}
+        {(hasInputConnections || hasOutputConnections) && (
+          <div className="absolute -top-2 -right-2 w-6 h-6 bg-blue-500 rounded-full flex items-center justify-center">
+            <span className="text-xs font-bold text-white">
+              {connections.filter(conn => conn.source === agent.id || conn.target === agent.id).length}
+            </span>
+          </div>
+        )}
+
         {/* Selection indicator */}
         {isSelected && (
           <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full flex items-center justify-center">
@@ -467,19 +575,22 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
             const inputType = nodeType.inputTypes[i];
             const isHovered = hoveredPin && hoveredPin.nodeId === agent.id && hoveredPin.pinIndex === i && !hoveredPin.isOutput;
             const isValidTarget = hoveredPin && hoveredPin.isValid;
+            const isConnected = connections.some(conn => conn.target === agent.id && conn.targetPin === i);
             
             return (
               <div
                 key={`input-${i}`}
                 className={`w-3 h-3 ${getPinColor(inputType)} border-2 rounded-full cursor-pointer pointer-events-auto hover:scale-125 transition-transform ${
                   isHovered ? (isValidTarget ? 'border-green-400 scale-150' : 'border-red-400 scale-150') : 'border-white'
+                } ${
+                  isConnected ? 'ring-2 ring-blue-400 ring-opacity-75' : ''
                 }`}
                 style={{ top: `${30 + i * 20}%` }}
                 onMouseDown={(e) => handlePinMouseDown(e, agent.id, inputType, i, false)}
                 onMouseUp={(e) => handlePinMouseUp(e, agent.id, inputType, i, false)}
                 onMouseEnter={() => handlePinMouseEnter(agent.id, inputType, i, false)}
                 onMouseLeave={handlePinMouseLeave}
-                title={`Input: ${inputType}`}
+                title={`Input: ${inputType}${isConnected ? ' (Connected)' : ''}`}
               />
             );
           })}
@@ -490,19 +601,22 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
           {Array.from({ length: nodeType.outputs }, (_, i) => {
             const outputType = nodeType.outputTypes[i];
             const isHovered = hoveredPin && hoveredPin.nodeId === agent.id && hoveredPin.pinIndex === i && hoveredPin.isOutput;
+            const isConnected = connections.some(conn => conn.source === agent.id && conn.sourcePin === i);
             
             return (
               <div
                 key={`output-${i}`}
                 className={`w-3 h-3 ${getPinColor(outputType)} border-2 rounded-full cursor-pointer pointer-events-auto hover:scale-125 transition-transform ${
                   isHovered ? 'border-green-400 scale-150' : 'border-white'
+                } ${
+                  isConnected ? 'ring-2 ring-blue-400 ring-opacity-75' : ''
                 }`}
                 style={{ top: `${30 + i * 20}%` }}
                 onMouseDown={(e) => handlePinMouseDown(e, agent.id, outputType, i, true)}
                 onMouseUp={(e) => handlePinMouseUp(e, agent.id, outputType, i, true)}
                 onMouseEnter={() => handlePinMouseEnter(agent.id, outputType, i, true)}
                 onMouseLeave={handlePinMouseLeave}
-                title={`Output: ${outputType}`}
+                title={`Output: ${outputType}${isConnected ? ' (Connected)' : ''}`}
               />
             );
           })}
@@ -525,6 +639,11 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
     >
       {/* Grid Background */}
       <div className="absolute inset-0 bg-[radial-gradient(#2e3c51_1px,transparent_1px)] [background-size:32px_32px] opacity-30"></div>
+
+      {/* Existing Connections */}
+      <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 400 }}>
+        {renderExistingConnections()}
+      </svg>
 
       {/* Connection Lines */}
       {renderConnectionLine()}

@@ -342,49 +342,8 @@ export default function Warehouse() {
             onNodeDelete={handleNodeDelete}
             selectedNode={selectedNode}
             onNodeSelect={handleNodeSelect}
+            connections={connections}
           />
-          
-          {/* Render Connections */}
-          <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 500 }}>
-            {connections.map(connection => {
-              const sourceAgent = agents.find(a => a.id === connection.source);
-              const targetAgent = agents.find(a => a.id === connection.target);
-              
-              if (!sourceAgent || !targetAgent) return null;
-              
-              const startX = sourceAgent.position.x + 220;
-              const startY = sourceAgent.position.y + 60 + (connection.sourcePin * 20);
-              const endX = targetAgent.position.x;
-              const endY = targetAgent.position.y + 60 + (connection.targetPin * 20);
-              
-              // Calculate control points for Bezier curve
-              const controlPoint1X = startX + 100;
-              const controlPoint1Y = startY;
-              const controlPoint2X = endX - 100;
-              const controlPoint2Y = endY;
-              
-              const connectionStyle = getConnectionStyle(connection.flowType, connection.sourceType);
-              
-              return (
-                <g key={connection.id}>
-                  <defs>
-                    <marker id={`arrowhead-${connection.id}`} markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                      <polygon points="0 0, 10 3.5, 0 7" fill={connectionStyle.stroke} />
-                    </marker>
-                  </defs>
-                  <path
-                    d={`M ${startX} ${startY} C ${controlPoint1X} ${controlPoint1Y}, ${controlPoint2X} ${controlPoint2Y}, ${endX} ${endY}`}
-                    stroke={connectionStyle.stroke}
-                    strokeWidth={connectionStyle.strokeWidth}
-                    strokeDasharray={connectionStyle.strokeDasharray}
-                    fill="none"
-                    markerEnd={`url(#arrowhead-${connection.id})`}
-                    className="drop-shadow-lg"
-                  />
-                </g>
-              );
-            })}
-          </svg>
         </div>
       </div>
       <SearchModal

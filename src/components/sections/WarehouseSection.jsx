@@ -18,8 +18,7 @@ import {
     Loader2,
     X
 } from 'lucide-react';
-import React, { useState } from "react";
-import ReactFlow, { ReactFlowProvider } from "react-flow-renderer";
+import ReactFlow, { ReactFlowProvider } from "reactflow";
 
 const WarehouseSection = () => {
     const [agents, setAgents] = useState([
@@ -75,6 +74,7 @@ const WarehouseSection = () => {
 
     const [selectedAgent, setSelectedAgent] = useState(null);
     const [showAgentOffice, setShowAgentOffice] = useState(false);
+    const [showViewport, setShowViewport] = useState(false);
 
     const getStatusColor = (status) => {
         switch (status) {
@@ -121,7 +121,7 @@ const WarehouseSection = () => {
 
     // [INÍCIO NOVO VIEWPORT DE AGENTES DE IA]
     // Componente AgentOffice (definido abaixo ou em outro arquivo futuramente)
-    const agents = [
+    const viewportAgents = [
       { id: "agent-001", position: { x: 100, y: 200 } },
       { id: "agent-002", position: { x: 800, y: 300 } },
       // ...adicione mais agentes conforme necessário
@@ -160,21 +160,45 @@ const WarehouseSection = () => {
 
     // Hook de status em tempo real (pode ser movido para src/hooks/useAgentStatus.js)
     function useAgentStatus(agentId) {
-      const [status, setStatus] = React.useState("idle");
-      const [tasks, setTasks] = React.useState([]);
-      const [metrics, setMetrics] = React.useState({ cpu: 0, memory: 0, lastRun: "" });
+      const [status, setStatus] = useState("idle");
+      const [tasks, setTasks] = useState([]);
+      const [metrics, setMetrics] = useState({ cpu: 0, memory: 0, lastRun: "" });
 
-      React.useEffect(() => {
-        const socket = new window.WebSocket("wss://api.mywarehouse.ai/agents");
-        socket.onmessage = (event) => {
-          const update = JSON.parse(event.data);
-          if (update.agentId === agentId) {
-            setStatus(update.status);
-            setTasks(update.tasks);
-            setMetrics(update.metrics);
+      useEffect(() => {
+        // Mock data for now - replace with real WebSocket later
+        const mockData = {
+          "agent-001": {
+            status: "running",
+            tasks: [
+              { name: "Task 1", status: "running" },
+              { name: "Task 2", status: "success" },
+              { name: "Task 3", status: "idle" }
+            ],
+            metrics: { cpu: "45%", memory: "2.1GB", lastRun: "2 min ago" }
+          },
+          "agent-002": {
+            status: "success",
+            tasks: [
+              { name: "Task A", status: "success" },
+              { name: "Task B", status: "success" },
+              { name: "Task C", status: "running" }
+            ],
+            metrics: { cpu: "32%", memory: "1.8GB", lastRun: "5 min ago" }
           }
         };
-        return () => socket.close();
+
+        const interval = setInterval(() => {
+          const data = mockData[agentId] || {
+            status: "idle",
+            tasks: [],
+            metrics: { cpu: "0%", memory: "0GB", lastRun: "Never" }
+          };
+          setStatus(data.status);
+          setTasks(data.tasks);
+          setMetrics(data.metrics);
+        }, 2000);
+
+        return () => clearInterval(interval);
       }, [agentId]);
 
       return { status, tasks, metrics };
@@ -186,12 +210,13 @@ const WarehouseSection = () => {
         <ReactFlowProvider>
           <div style={{ width: "100vw", height: "100vh" }}>
             <ReactFlow
-              elements={agents.map(agent => ({
+              nodes={viewportAgents.map(agent => ({
                 id: agent.id,
                 type: "default",
                 position: agent.position,
                 data: { label: <AgentOffice id={agent.id} /> }
               }))}
+              edges={[]}
               zoomOnScroll
               panOnScroll
               snapToGrid
@@ -215,10 +240,19 @@ const WarehouseSection = () => {
                         <p className="text-gray-400">Gerencie seus agentes AI e monitore suas atividades</p>
                     </div>
                 </div>
-                <button className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg transition-colors">
-                    <Plus size={20} />
-                    <span>Novo Agente</span>
-                </button>
+                                 <div className="flex items-center space-x-2">
+                     <button 
+                         onClick={() => setShowViewport(!showViewport)}
+                         className="flex items-center space-x-2 bg-purple-600 hover:bg-purple-700 px-4 py-2 rounded-lg transition-colors"
+                     >
+                         <Warehouse size={20} />
+                         <span>{showViewport ? 'Ver Grid' : 'Ver Viewport'}</span>
+                     </button>
+                     <button className="flex items-center space-x-2 bg-indigo-600 hover:bg-indigo-700 px-4 py-2 rounded-lg transition-colors">
+                         <Plus size={20} />
+                         <span>Novo Agente</span>
+                     </button>
+                 </div>
             </div>
 
             {/* Stats Overview */}
@@ -269,8 +303,13 @@ const WarehouseSection = () => {
                 </div>
             </div>
 
-            {/* Agents Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                         {/* Agents Grid or Viewport */}
+             {showViewport ? (
+                 <div className="h-96 bg-gray-800 rounded-lg overflow-hidden">
+                     <AIWarehouseViewport />
+                 </div>
+             ) : (
+                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
                 {agents.map((agent) => (
                     <div 
                         key={agent.id}
@@ -383,7 +422,8 @@ const WarehouseSection = () => {
                         </button>
                     </div>
                 ))}
-            </div>
+                </div>
+            )}
 
             {/* Agent Office Modal */}
             {showAgentOffice && selectedAgent && (
@@ -407,29 +447,18 @@ const WarehouseSection = () => {
                             </button>
                         </div>
 
-                        {/* Agent Office Content */}
-                        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                            {/* Real-time Activity */}
-                            <div className="bg-gray-700 rounded-lg p-4">
-                                <h3 className="font-semibold mb-4 flex items-center space-x-2">
-                                    <Activity size={20} />
-                                    <span>Atividade em Tempo Real</span>
-                                </h3>
-                                <div className="space-y-3">
-                                    <div className="flex items-center space-x-3 p-3 bg-gray-600 rounded">
-                                        <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                                        <span className="text-sm">Processando dados de entrada...</span>
-                                    </div>
-                                    <div className="flex items-center space-x-3 p-3 bg-gray-600 rounded">
-                                        <div className="w-2 h-2 bg-blue-400 rounded-full animate-pulse"></div>
-                                        <span className="text-sm">Aplicando regras de negócio...</span>
-                                    </div>
-                                    <div className="flex items-center space-x-3 p-3 bg-gray-600 rounded">
-                                        <div className="w-2 h-2 bg-purple-400 rounded-full animate-pulse"></div>
-                                        <span className="text-sm">Gerando saída otimizada...</span>
-                                    </div>
-                                </div>
-                            </div>
+                                                 {/* Agent Office Content */}
+                         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                             {/* AI Warehouse Viewport */}
+                             <div className="bg-gray-700 rounded-lg p-4">
+                                 <h3 className="font-semibold mb-4 flex items-center space-x-2">
+                                     <Warehouse size={20} />
+                                     <span>AI Warehouse Viewport</span>
+                                 </h3>
+                                 <div className="h-64 bg-gray-800 rounded-lg overflow-hidden">
+                                     <AIWarehouseViewport />
+                                 </div>
+                             </div>
 
                             {/* Decision Making */}
                             <div className="bg-gray-700 rounded-lg p-4">

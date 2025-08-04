@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect } from "react";
+import React, { useState, useRef, useEffect, useCallback, useMemo } from "react";
 import { motion } from "framer-motion";
 import { 
   Brain, 
@@ -134,42 +134,8 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
   const [activeConnections, setActiveConnections] = useState(new Set());
   const workspaceRef = useRef(null);
 
-  // Handle keyboard events
-  useEffect(() => {
-    const handleKeyDown = (e) => {
-      if (e.key === 'Delete' && selectedNode) {
-        onNodeDelete(selectedNode);
-      }
-    };
-
-    document.addEventListener('keydown', handleKeyDown);
-    return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [selectedNode, onNodeDelete]);
-
-  // Simulate active connections
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (connections && connections.length > 0) {
-        const randomConnection = connections[Math.floor(Math.random() * connections.length)];
-        setActiveConnections(prev => {
-          const newSet = new Set(prev);
-          newSet.add(randomConnection.id);
-          setTimeout(() => {
-            setActiveConnections(current => {
-              const updated = new Set(current);
-              updated.delete(randomConnection.id);
-              return updated;
-            });
-          }, 1000);
-          return newSet;
-        });
-      }
-    }, 3000);
-
-    return () => clearInterval(interval);
-  }, [connections]);
-
-  const getStatusIcon = (status) => {
+  // Memoized functions for better performance
+  const getStatusIcon = useCallback((status) => {
     switch (status) {
       case 'running': return <Loader2 size={16} className="animate-spin text-blue-400" />;
       case 'success': return <CheckCircle size={16} className="text-green-400" />;
@@ -177,9 +143,9 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
       case 'idle': return <Pause size={16} className="text-gray-400" />;
       default: return <Activity size={16} className="text-gray-400" />;
     }
-  };
+  }, []);
 
-  const getStatusColor = (status) => {
+  const getStatusColor = useCallback((status) => {
     switch (status) {
       case 'running': return 'border-blue-400 bg-blue-900/20';
       case 'success': return 'border-green-400 bg-green-900/20';
@@ -187,9 +153,9 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
       case 'idle': return 'border-gray-400 bg-gray-900/20';
       default: return 'border-gray-400 bg-gray-900/20';
     }
-  };
+  }, []);
 
-  const getPinColor = (type) => {
+  const getPinColor = useCallback((type) => {
     switch (type) {
       case 'trigger': return 'bg-orange-500';
       case 'data': return 'bg-blue-500';
@@ -202,23 +168,21 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
       case 'agent': return 'bg-orange-500';
       default: return 'bg-gray-500';
     }
-  };
+  }, []);
 
-  const isCompatibleConnection = (sourceType, targetType, sourceIsOutput, targetIsOutput) => {
-    // Prevent invalid connections
-    if (sourceIsOutput === targetIsOutput) return false; // Can't connect output->output or input->input
-    if (!sourceIsOutput) return false; // Can only start from output
+  const isCompatibleConnection = useCallback((sourceType, targetType, sourceIsOutput, targetIsOutput) => {
+    if (sourceIsOutput === targetIsOutput) return false;
+    if (!sourceIsOutput) return false;
     
-    // Check type compatibility
     if (sourceType === targetType) return true;
-    if (targetType === 'data') return true; // Data accepts any type
-    if (sourceType === 'trigger') return true; // Trigger can start any flow
-    if (sourceType === 'agent' && targetType === 'data') return true; // Agent can connect to data
+    if (targetType === 'data') return true;
+    if (sourceType === 'trigger') return true;
+    if (sourceType === 'agent' && targetType === 'data') return true;
     
     return false;
-  };
+  }, []);
 
-  const getConnectionStyle = (flowType, dataType) => {
+  const getConnectionStyle = useCallback((flowType, dataType) => {
     if (flowType === 'exec') {
       return {
         stroke: '#ffffff',
@@ -242,27 +206,61 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
         strokeWidth: 3
       };
     }
-  };
+  }, []);
 
-  const handleNodeMouseDown = (e, node) => {
+  // Handle keyboard events
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Delete' && selectedNode) {
+        onNodeDelete(selectedNode);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [selectedNode, onNodeDelete]);
+
+  // Simulate active connections with throttling
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (connections && connections.length > 0) {
+        const randomConnection = connections[Math.floor(Math.random() * connections.length)];
+        setActiveConnections(prev => {
+          const newSet = new Set(prev);
+          newSet.add(randomConnection.id);
+          setTimeout(() => {
+            setActiveConnections(current => {
+              const updated = new Set(current);
+              updated.delete(randomConnection.id);
+              return updated;
+            });
+          }, 1000);
+          return newSet;
+        });
+      }
+    }, 5000); // Increased interval for better performance
+
+    return () => clearInterval(interval);
+  }, [connections]);
+
+  const handleNodeMouseDown = useCallback((e, node) => {
     e.stopPropagation();
     setDraggedNode(node);
     onNodeSelect(node);
-  };
+  }, [onNodeSelect]);
 
-  const handleMouseMove = (e) => {
+  const handleMouseMove = useCallback((e) => {
     if (draggedNode) {
       const rect = workspaceRef.current.getBoundingClientRect();
       const x = (e.clientX - rect.left - pan.x) / zoom;
       const y = (e.clientY - rect.top - pan.y) / zoom;
       
-      // Check for auto-connect when dragging over other nodes
       const overlappingNode = agents.find(agent => {
         if (agent.id === draggedNode.id) return false;
         const distance = Math.sqrt(
           Math.pow(x - agent.position.x, 2) + Math.pow(y - agent.position.y, 2)
         );
-        return distance < 150; // Auto-connect threshold
+        return distance < 150;
       });
 
       if (overlappingNode) {
@@ -274,11 +272,10 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
       onNodeMove(draggedNode.id, { x, y });
     }
     setMousePos({ x: e.clientX, y: e.clientY });
-  };
+  }, [draggedNode, pan, zoom, agents, onNodeMove]);
 
-  const handleMouseUp = () => {
+  const handleMouseUp = useCallback(() => {
     if (draggedNode && autoConnectTarget) {
-      // Auto-connect the nodes
       const sourceNodeType = NODE_TYPES[draggedNode.type];
       const targetNodeType = NODE_TYPES[autoConnectTarget.type];
       
@@ -306,20 +303,19 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
       setDraggedPin(null);
       setConnectionError(null);
     }
-  };
+  }, [draggedNode, autoConnectTarget, isDraggingConnection, isCompatibleConnection, onNodeConnect]);
 
-  const handlePinMouseDown = (e, nodeId, pinType, pinIndex, isOutput) => {
+  const handlePinMouseDown = useCallback((e, nodeId, pinType, pinIndex, isOutput) => {
     e.stopPropagation();
     setIsDraggingConnection(true);
     setDraggedPin({ nodeId, pinType, pinIndex, isOutput });
     setConnectionError(null);
-  };
+  }, []);
 
-  const handlePinMouseUp = (e, targetNodeId, targetPinType, targetPinIndex, targetIsOutput) => {
+  const handlePinMouseUp = useCallback((e, targetNodeId, targetPinType, targetPinIndex, targetIsOutput) => {
     e.stopPropagation();
     
     if (draggedPin && draggedPin.nodeId !== targetNodeId) {
-      // Validate connection
       const sourceNode = agents.find(a => a.id === draggedPin.nodeId);
       const targetNode = agents.find(a => a.id === targetNodeId);
       
@@ -355,9 +351,9 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
     
     setIsDraggingConnection(false);
     setDraggedPin(null);
-  };
+  }, [draggedPin, agents, isCompatibleConnection, onNodeConnect]);
 
-  const handlePinMouseEnter = (nodeId, pinType, pinIndex, isOutput) => {
+  const handlePinMouseEnter = useCallback((nodeId, pinType, pinIndex, isOutput) => {
     if (isDraggingConnection && draggedPin) {
       const sourceNode = agents.find(a => a.id === draggedPin.nodeId);
       const targetNode = agents.find(a => a.id === nodeId);
@@ -379,13 +375,81 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
         setHoveredPin({ nodeId, pinType, pinIndex, isOutput, isValid });
       }
     }
-  };
+  }, [isDraggingConnection, draggedPin, agents, isCompatibleConnection]);
 
-  const handlePinMouseLeave = () => {
+  const handlePinMouseLeave = useCallback(() => {
     setHoveredPin(null);
-  };
+  }, []);
 
-  const renderConnectionLine = () => {
+  // Memoized connection rendering
+  const renderExistingConnections = useMemo(() => {
+    if (!connections || connections.length === 0) return null;
+    
+    return connections.map(connection => {
+      const sourceAgent = agents.find(a => a.id === connection.source);
+      const targetAgent = agents.find(a => a.id === connection.target);
+      
+      if (!sourceAgent || !targetAgent) return null;
+      
+      const startX = sourceAgent.position.x + 220;
+      const startY = sourceAgent.position.y + 60 + (connection.sourcePin * 20);
+      const endX = targetAgent.position.x;
+      const endY = targetAgent.position.y + 60 + (connection.targetPin * 20);
+      
+      const controlPoint1X = startX + 100;
+      const controlPoint1Y = startY;
+      const controlPoint2X = endX - 100;
+      const controlPoint2Y = endY;
+      
+      const connectionStyle = getConnectionStyle(connection.flowType, connection.sourceType);
+      const isActive = activeConnections.has(connection.id);
+      
+      return (
+        <g key={connection.id}>
+          <defs>
+            <marker id={`arrowhead-${connection.id}`} markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+              <polygon points="0 0, 10 3.5, 0 7" fill={connectionStyle.stroke} />
+            </marker>
+          </defs>
+          <path
+            d={`M ${startX} ${startY} C ${controlPoint1X} ${controlPoint1Y}, ${controlPoint2X} ${controlPoint2Y}, ${endX} ${endY}`}
+            stroke={connectionStyle.stroke}
+            strokeWidth={connectionStyle.strokeWidth}
+            strokeDasharray={connectionStyle.strokeDasharray}
+            fill="none"
+            markerEnd={`url(#arrowhead-${connection.id})`}
+            className="drop-shadow-lg"
+          />
+          {isActive && (
+            <path
+              d={`M ${startX} ${startY} C ${controlPoint1X} ${controlPoint1Y}, ${controlPoint2X} ${controlPoint2Y}, ${endX} ${endY}`}
+              stroke="#ffffff"
+              strokeWidth="4"
+              strokeDasharray="5,5"
+              fill="none"
+              className="animate-pulse"
+            />
+          )}
+          <circle
+            cx={startX}
+            cy={startY}
+            r="4"
+            fill={connectionStyle.stroke}
+            className="drop-shadow-md"
+          />
+          <circle
+            cx={endX}
+            cy={endY}
+            r="4"
+            fill={connectionStyle.stroke}
+            className="drop-shadow-md"
+          />
+        </g>
+      );
+    });
+  }, [connections, agents, getConnectionStyle, activeConnections]);
+
+  const renderConnectionLine = useMemo(() => {
     if (!isDraggingConnection || !draggedPin) return null;
     
     const sourceNode = agents.find(a => a.id === draggedPin.nodeId);
@@ -397,7 +461,6 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
     const endX = mousePos.x;
     const endY = mousePos.y;
 
-    // Calculate control points for Bezier curve
     const controlPoint1X = startX + 100;
     const controlPoint1Y = startY;
     const controlPoint2X = endX - 100;
@@ -423,88 +486,15 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
         />
       </svg>
     );
-  };
+  }, [isDraggingConnection, draggedPin, agents, mousePos, hoveredPin, getConnectionStyle]);
 
-  const renderExistingConnections = () => {
-    if (!connections || connections.length === 0) return null;
-    
-    return connections.map(connection => {
-      const sourceAgent = agents.find(a => a.id === connection.source);
-      const targetAgent = agents.find(a => a.id === connection.target);
-      
-      if (!sourceAgent || !targetAgent) return null;
-      
-      const startX = sourceAgent.position.x + 220;
-      const startY = sourceAgent.position.y + 60 + (connection.sourcePin * 20);
-      const endX = targetAgent.position.x;
-      const endY = targetAgent.position.y + 60 + (connection.targetPin * 20);
-      
-      // Calculate control points for Bezier curve
-      const controlPoint1X = startX + 100;
-      const controlPoint1Y = startY;
-      const controlPoint2X = endX - 100;
-      const controlPoint2Y = endY;
-      
-      const connectionStyle = getConnectionStyle(connection.flowType, connection.sourceType);
-      const isActive = activeConnections.has(connection.id);
-      
-      return (
-        <g key={connection.id}>
-          <defs>
-            <marker id={`arrowhead-${connection.id}`} markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-              <polygon points="0 0, 10 3.5, 0 7" fill={connectionStyle.stroke} />
-            </marker>
-          </defs>
-          {/* Main connection line */}
-          <path
-            d={`M ${startX} ${startY} C ${controlPoint1X} ${controlPoint1Y}, ${controlPoint2X} ${controlPoint2Y}, ${endX} ${endY}`}
-            stroke={connectionStyle.stroke}
-            strokeWidth={connectionStyle.strokeWidth}
-            strokeDasharray={connectionStyle.strokeDasharray}
-            fill="none"
-            markerEnd={`url(#arrowhead-${connection.id})`}
-            className="drop-shadow-lg"
-          />
-          {/* Active connection indicator */}
-          {isActive && (
-            <path
-              d={`M ${startX} ${startY} C ${controlPoint1X} ${controlPoint1Y}, ${controlPoint2X} ${controlPoint2Y}, ${endX} ${endY}`}
-              stroke="#ffffff"
-              strokeWidth="4"
-              strokeDasharray="5,5"
-              fill="none"
-              className="animate-pulse"
-            />
-          )}
-          {/* Connection points */}
-          <circle
-            cx={startX}
-            cy={startY}
-            r="4"
-            fill={connectionStyle.stroke}
-            className="drop-shadow-md"
-          />
-          <circle
-            cx={endX}
-            cy={endY}
-            r="4"
-            fill={connectionStyle.stroke}
-            className="drop-shadow-md"
-          />
-        </g>
-      );
-    });
-  };
-
-  const renderNode = (agent) => {
+  const renderNode = useCallback((agent) => {
     const nodeType = NODE_TYPES[agent.type] || { icon: Brain, color: 'bg-gray-500', inputs: 0, outputs: 1 };
     const IconComponent = nodeType.icon;
     const agentTasks = tasks[agent.id] || [];
     const activeTasks = agentTasks.filter(task => task.status === 'running' || task.status === 'processing');
     const isSelected = selectedNode && selectedNode.id === agent.id;
     const isAutoConnectTarget = autoConnectTarget && autoConnectTarget.id === agent.id;
-
-    // Check if this node has connections
     const hasInputConnections = connections && connections.some(conn => conn.target === agent.id);
     const hasOutputConnections = connections && connections.some(conn => conn.source === agent.id);
 
@@ -646,7 +636,12 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
         </div>
       </motion.div>
     );
-  };
+  }, [
+    tasks, selectedNode, autoConnectTarget, connections, draggedNode, zoom,
+    getStatusIcon, getStatusColor, getPinColor, handleNodeMouseDown, onToggleStatus,
+    handlePinMouseDown, handlePinMouseUp, handlePinMouseEnter, handlePinMouseLeave,
+    hoveredPin
+  ]);
 
   return (
     <div
@@ -665,11 +660,11 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
 
       {/* Existing Connections */}
       <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 400 }}>
-        {renderExistingConnections()}
+        {renderExistingConnections}
       </svg>
 
       {/* Connection Lines */}
-      {renderConnectionLine()}
+      {renderConnectionLine}
 
       {/* Error Message */}
       {connectionError && (

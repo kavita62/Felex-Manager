@@ -71,8 +71,24 @@ export default function Warehouse() {
   });
   
   const [connections, setConnections] = useState([
-    { id: 1, source: 1, target: 2 },
-    { id: 2, source: 2, target: 3 }
+    { 
+      id: 1, 
+      source: 1, 
+      target: 2,
+      sourcePin: 0,
+      targetPin: 0,
+      sourceType: 'trigger',
+      targetType: 'trigger'
+    },
+    { 
+      id: 2, 
+      source: 2, 
+      target: 3,
+      sourcePin: 0,
+      targetPin: 0,
+      sourceType: 'text',
+      targetType: 'text'
+    }
   ]);
   
   const [isLoading, setIsLoading] = useState(false);
@@ -179,14 +195,15 @@ export default function Warehouse() {
     );
   };
 
-  const handleNodeConnect = (sourceId, targetId) => {
+  const handleNodeConnect = (sourceId, targetId, connectionData) => {
     const newConnection = {
       id: Date.now(),
       source: sourceId,
-      target: targetId
+      target: targetId,
+      ...connectionData
     };
     setConnections(prev => [...prev, newConnection]);
-    console.log(`Connected node ${sourceId} to ${targetId}`);
+    console.log(`Connected node ${sourceId} to ${targetId}`, connectionData);
   };
 
   const handleContextMenu = (e) => {
@@ -235,6 +252,20 @@ export default function Warehouse() {
     setPan({ x: 100, y: 50 });
   };
 
+  const getConnectionColor = (sourceType) => {
+    switch (sourceType) {
+      case 'trigger': return '#f97316'; // orange
+      case 'data': return '#3b82f6'; // blue
+      case 'text': return '#a855f7'; // purple
+      case 'image': return '#ec4899'; // pink
+      case 'video': return '#ef4444'; // red
+      case 'status': return '#22c55e'; // green
+      case 'result': return '#eab308'; // yellow
+      case 'approval': return '#06b6d4'; // cyan
+      default: return '#6b7280'; // gray
+    }
+  };
+
   return (
     <div className="h-screen w-full flex flex-col overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 text-white">
       <TopBar 
@@ -271,7 +302,7 @@ export default function Warehouse() {
           <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 500 }}>
             <defs>
               <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
-                <polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6" />
+                <polygon points="0 0, 10 3.5, 0 7" fill="currentColor" />
               </marker>
             </defs>
             {connections.map(connection => {
@@ -280,22 +311,35 @@ export default function Warehouse() {
               
               if (!sourceAgent || !targetAgent) return null;
               
-              const startX = sourceAgent.position.x + 200;
-              const startY = sourceAgent.position.y + 50;
+              const startX = sourceAgent.position.x + 220;
+              const startY = sourceAgent.position.y + 60 + (connection.sourcePin * 20);
               const endX = targetAgent.position.x;
-              const endY = targetAgent.position.y + 50;
+              const endY = targetAgent.position.y + 60 + (connection.targetPin * 20);
+              
+              // Calculate control points for Bezier curve
+              const controlPoint1X = startX + 100;
+              const controlPoint1Y = startY;
+              const controlPoint2X = endX - 100;
+              const controlPoint2Y = endY;
+              
+              const connectionColor = getConnectionColor(connection.sourceType);
               
               return (
-                <line
-                  key={connection.id}
-                  x1={startX}
-                  y1={startY}
-                  x2={endX}
-                  y2={endY}
-                  stroke="#3b82f6"
-                  strokeWidth="2"
-                  markerEnd="url(#arrowhead)"
-                />
+                <g key={connection.id}>
+                  <defs>
+                    <marker id={`arrowhead-${connection.id}`} markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                      <polygon points="0 0, 10 3.5, 0 7" fill={connectionColor} />
+                    </marker>
+                  </defs>
+                  <path
+                    d={`M ${startX} ${startY} C ${controlPoint1X} ${controlPoint1Y}, ${controlPoint2X} ${controlPoint2Y}, ${endX} ${endY}`}
+                    stroke={connectionColor}
+                    strokeWidth="3"
+                    fill="none"
+                    markerEnd={`url(#arrowhead-${connection.id})`}
+                    className="drop-shadow-lg"
+                  />
+                </g>
               );
             })}
           </svg>

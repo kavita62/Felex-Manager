@@ -27,22 +27,89 @@ import {
 } from "lucide-react";
 
 const NODE_TYPES = {
-  'on-trigger': { icon: ExternalLink, color: 'bg-blue-500', inputs: 0, outputs: 1 },
-  'on-schedule': { icon: Calendar, color: 'bg-indigo-500', inputs: 0, outputs: 1 },
-  'check-status': { icon: Search, color: 'bg-green-500', inputs: 1, outputs: 1 },
-  'automate-task': { icon: Zap, color: 'bg-yellow-500', inputs: 1, outputs: 1 },
-  'generate-text': { icon: FileText, color: 'bg-purple-500', inputs: 1, outputs: 1 },
-  'generate-image': { icon: Image, color: 'bg-pink-500', inputs: 1, outputs: 1 },
-  'generate-video': { icon: Video, color: 'bg-red-500', inputs: 1, outputs: 1 },
-  'send-for-approval': { icon: UserCheck, color: 'bg-cyan-500', inputs: 1, outputs: 1 },
-  'check-memory': { icon: Database, color: 'bg-teal-500', inputs: 0, outputs: 1 },
-  'check-task-list': { icon: List, color: 'bg-gray-500', inputs: 0, outputs: 1 }
+  'on-trigger': { 
+    icon: ExternalLink, 
+    color: 'bg-blue-500', 
+    inputs: 0, 
+    outputs: 1,
+    outputTypes: ['trigger']
+  },
+  'on-schedule': { 
+    icon: Calendar, 
+    color: 'bg-indigo-500', 
+    inputs: 0, 
+    outputs: 1,
+    outputTypes: ['trigger']
+  },
+  'check-status': { 
+    icon: Search, 
+    color: 'bg-green-500', 
+    inputs: 1, 
+    outputs: 1,
+    inputTypes: ['trigger', 'data'],
+    outputTypes: ['status']
+  },
+  'automate-task': { 
+    icon: Zap, 
+    color: 'bg-yellow-500', 
+    inputs: 1, 
+    outputs: 1,
+    inputTypes: ['trigger', 'data'],
+    outputTypes: ['result']
+  },
+  'generate-text': { 
+    icon: FileText, 
+    color: 'bg-purple-500', 
+    inputs: 1, 
+    outputs: 1,
+    inputTypes: ['trigger', 'data'],
+    outputTypes: ['text']
+  },
+  'generate-image': { 
+    icon: Image, 
+    color: 'bg-pink-500', 
+    inputs: 1, 
+    outputs: 1,
+    inputTypes: ['trigger', 'data'],
+    outputTypes: ['image']
+  },
+  'generate-video': { 
+    icon: Video, 
+    color: 'bg-red-500', 
+    inputs: 1, 
+    outputs: 1,
+    inputTypes: ['trigger', 'data'],
+    outputTypes: ['video']
+  },
+  'send-for-approval': { 
+    icon: UserCheck, 
+    color: 'bg-cyan-500', 
+    inputs: 1, 
+    outputs: 1,
+    inputTypes: ['trigger', 'data', 'text', 'image', 'video'],
+    outputTypes: ['approval']
+  },
+  'check-memory': { 
+    icon: Database, 
+    color: 'bg-teal-500', 
+    inputs: 0, 
+    outputs: 1,
+    outputTypes: ['data']
+  },
+  'check-task-list': { 
+    icon: List, 
+    color: 'bg-gray-500', 
+    inputs: 0, 
+    outputs: 1,
+    outputTypes: ['data']
+  }
 };
 
 export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, onAgentClick, onNodeMove, onNodeConnect }) {
   const [draggedNode, setDraggedNode] = useState(null);
-  const [connectionStart, setConnectionStart] = useState(null);
+  const [draggedPin, setDraggedPin] = useState(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
+  const [isDraggingConnection, setIsDraggingConnection] = useState(false);
   const workspaceRef = useRef(null);
 
   const getStatusIcon = (status) => {
@@ -65,6 +132,20 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
     }
   };
 
+  const getPinColor = (type) => {
+    switch (type) {
+      case 'trigger': return 'bg-orange-500';
+      case 'data': return 'bg-blue-500';
+      case 'text': return 'bg-purple-500';
+      case 'image': return 'bg-pink-500';
+      case 'video': return 'bg-red-500';
+      case 'status': return 'bg-green-500';
+      case 'result': return 'bg-yellow-500';
+      case 'approval': return 'bg-cyan-500';
+      default: return 'bg-gray-500';
+    }
+  };
+
   const handleNodeMouseDown = (e, node) => {
     e.stopPropagation();
     setDraggedNode(node);
@@ -82,33 +163,72 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
 
   const handleMouseUp = () => {
     setDraggedNode(null);
-  };
-
-  const handleConnectionStart = (e, nodeId, isOutput) => {
-    e.stopPropagation();
-    setConnectionStart({ nodeId, isOutput });
-  };
-
-  const handleConnectionEnd = (e, targetNodeId, isOutput) => {
-    e.stopPropagation();
-    if (connectionStart && connectionStart.nodeId !== targetNodeId) {
-      const sourceNode = connectionStart.isOutput ? connectionStart.nodeId : targetNodeId;
-      const targetNode = connectionStart.isOutput ? targetNodeId : connectionStart.nodeId;
-      onNodeConnect(sourceNode, targetNode);
+    if (isDraggingConnection) {
+      setIsDraggingConnection(false);
+      setDraggedPin(null);
     }
-    setConnectionStart(null);
+  };
+
+  const handlePinMouseDown = (e, nodeId, pinType, pinIndex, isOutput) => {
+    e.stopPropagation();
+    setIsDraggingConnection(true);
+    setDraggedPin({ nodeId, pinType, pinIndex, isOutput });
+  };
+
+  const handlePinMouseUp = (e, targetNodeId, targetPinType, targetPinIndex, targetIsOutput) => {
+    e.stopPropagation();
+    
+    if (draggedPin && draggedPin.nodeId !== targetNodeId) {
+      // Validate connection
+      const sourceNode = agents.find(a => a.id === draggedPin.nodeId);
+      const targetNode = agents.find(a => a.id === targetNodeId);
+      
+      if (sourceNode && targetNode) {
+        const sourceNodeType = NODE_TYPES[sourceNode.type];
+        const targetNodeType = NODE_TYPES[targetNode.type];
+        
+        // Only allow output to input connections
+        if (draggedPin.isOutput && !targetIsOutput) {
+          const sourceOutputType = sourceNodeType.outputTypes[draggedPin.pinIndex];
+          const targetInputType = targetNodeType.inputTypes[targetPinIndex];
+          
+          // Check if types are compatible
+          if (sourceOutputType && targetInputType && 
+              (sourceOutputType === targetInputType || 
+               targetInputType === 'data' || 
+               sourceOutputType === 'trigger')) {
+            onNodeConnect(draggedPin.nodeId, targetNodeId, {
+              sourcePin: draggedPin.pinIndex,
+              targetPin: targetPinIndex,
+              sourceType: sourceOutputType,
+              targetType: targetInputType
+            });
+          }
+        }
+      }
+    }
+    
+    setIsDraggingConnection(false);
+    setDraggedPin(null);
   };
 
   const renderConnectionLine = () => {
-    if (!connectionStart) return null;
+    if (!isDraggingConnection || !draggedPin) return null;
     
-    const startNode = agents.find(a => a.id === connectionStart.nodeId);
-    if (!startNode) return null;
+    const sourceNode = agents.find(a => a.id === draggedPin.nodeId);
+    if (!sourceNode) return null;
 
-    const startX = startNode.position.x + 200; // Output position
-    const startY = startNode.position.y + 50;
+    const nodeType = NODE_TYPES[sourceNode.type];
+    const startX = sourceNode.position.x + 220; // Output position
+    const startY = sourceNode.position.y + 60 + (draggedPin.pinIndex * 20);
     const endX = mousePos.x;
     const endY = mousePos.y;
+
+    // Calculate control points for Bezier curve
+    const controlPoint1X = startX + 100;
+    const controlPoint1Y = startY;
+    const controlPoint2X = endX - 100;
+    const controlPoint2Y = endY;
 
     return (
       <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 1000 }}>
@@ -117,13 +237,11 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
             <polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6" />
           </marker>
         </defs>
-        <line
-          x1={startX}
-          y1={startY}
-          x2={endX}
-          y2={endY}
+        <path
+          d={`M ${startX} ${startY} C ${controlPoint1X} ${controlPoint1Y}, ${controlPoint2X} ${controlPoint2Y}, ${endX} ${endY}`}
           stroke="#3b82f6"
           strokeWidth="2"
+          fill="none"
           markerEnd="url(#arrowhead)"
         />
       </svg>
@@ -196,29 +314,38 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
           </div>
         </div>
 
-        {/* Connection Points */}
-        <div className="absolute inset-0 pointer-events-none">
-          {/* Input Connections */}
-          {Array.from({ length: nodeType.inputs }, (_, i) => (
-            <div
-              key={`input-${i}`}
-              className="absolute left-0 w-3 h-3 bg-slate-600 border border-slate-500 rounded-full cursor-pointer pointer-events-auto hover:bg-slate-500"
-              style={{ top: `${50 + i * 20}%` }}
-              onMouseDown={(e) => handleConnectionStart(e, agent.id, false)}
-              onMouseUp={(e) => handleConnectionEnd(e, agent.id, false)}
-            />
-          ))}
-          
-          {/* Output Connections */}
-          {Array.from({ length: nodeType.outputs }, (_, i) => (
-            <div
-              key={`output-${i}`}
-              className="absolute right-0 w-3 h-3 bg-blue-500 border border-blue-400 rounded-full cursor-pointer pointer-events-auto hover:bg-blue-400"
-              style={{ top: `${50 + i * 20}%` }}
-              onMouseDown={(e) => handleConnectionStart(e, agent.id, true)}
-              onMouseUp={(e) => handleConnectionEnd(e, agent.id, true)}
-            />
-          ))}
+        {/* Input Pins */}
+        <div className="absolute left-0 top-0 bottom-0 flex flex-col justify-center space-y-2 pointer-events-none">
+          {Array.from({ length: nodeType.inputs }, (_, i) => {
+            const inputType = nodeType.inputTypes[i];
+            return (
+              <div
+                key={`input-${i}`}
+                className={`w-3 h-3 ${getPinColor(inputType)} border border-white rounded-full cursor-pointer pointer-events-auto hover:scale-125 transition-transform`}
+                style={{ top: `${30 + i * 20}%` }}
+                onMouseDown={(e) => handlePinMouseDown(e, agent.id, inputType, i, false)}
+                onMouseUp={(e) => handlePinMouseUp(e, agent.id, inputType, i, false)}
+                title={`Input: ${inputType}`}
+              />
+            );
+          })}
+        </div>
+        
+        {/* Output Pins */}
+        <div className="absolute right-0 top-0 bottom-0 flex flex-col justify-center space-y-2 pointer-events-none">
+          {Array.from({ length: nodeType.outputs }, (_, i) => {
+            const outputType = nodeType.outputTypes[i];
+            return (
+              <div
+                key={`output-${i}`}
+                className={`w-3 h-3 ${getPinColor(outputType)} border border-white rounded-full cursor-pointer pointer-events-auto hover:scale-125 transition-transform`}
+                style={{ top: `${30 + i * 20}%` }}
+                onMouseDown={(e) => handlePinMouseDown(e, agent.id, outputType, i, true)}
+                onMouseUp={(e) => handlePinMouseUp(e, agent.id, outputType, i, true)}
+                title={`Output: ${outputType}`}
+              />
+            );
+          })}
         </div>
       </motion.div>
     );

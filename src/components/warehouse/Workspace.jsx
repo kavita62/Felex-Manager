@@ -1,4 +1,4 @@
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { motion } from "framer-motion";
 import { 
   Brain, 
@@ -115,14 +115,27 @@ const NODE_TYPES = {
   }
 };
 
-export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, onAgentClick, onNodeMove, onNodeConnect }) {
+export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, onAgentClick, onNodeMove, onNodeConnect, onNodeDelete, selectedNode, onNodeSelect }) {
   const [draggedNode, setDraggedNode] = useState(null);
   const [draggedPin, setDraggedPin] = useState(null);
   const [mousePos, setMousePos] = useState({ x: 0, y: 0 });
   const [isDraggingConnection, setIsDraggingConnection] = useState(false);
   const [hoveredPin, setHoveredPin] = useState(null);
   const [connectionError, setConnectionError] = useState(null);
+  const [autoConnectTarget, setAutoConnectTarget] = useState(null);
   const workspaceRef = useRef(null);
+
+  // Handle keyboard events
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Delete' && selectedNode) {
+        onNodeDelete(selectedNode);
+      }
+    };
+
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [selectedNode, onNodeDelete]);
 
   const getStatusIcon = (status) => {
     switch (status) {
@@ -189,6 +202,7 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
   const handleNodeMouseDown = (e, node) => {
     e.stopPropagation();
     setDraggedNode(node);
+    onNodeSelect(node);
   };
 
   const handleMouseMove = (e) => {
@@ -196,13 +210,52 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
       const rect = workspaceRef.current.getBoundingClientRect();
       const x = (e.clientX - rect.left - pan.x) / zoom;
       const y = (e.clientY - rect.top - pan.y) / zoom;
+      
+      // Check for auto-connect when dragging over other nodes
+      const overlappingNode = agents.find(agent => {
+        if (agent.id === draggedNode.id) return false;
+        const distance = Math.sqrt(
+          Math.pow(x - agent.position.x, 2) + Math.pow(y - agent.position.y, 2)
+        );
+        return distance < 150; // Auto-connect threshold
+      });
+
+      if (overlappingNode) {
+        setAutoConnectTarget(overlappingNode);
+      } else {
+        setAutoConnectTarget(null);
+      }
+
       onNodeMove(draggedNode.id, { x, y });
     }
     setMousePos({ x: e.clientX, y: e.clientY });
   };
 
   const handleMouseUp = () => {
+    if (draggedNode && autoConnectTarget) {
+      // Auto-connect the nodes
+      const sourceNodeType = NODE_TYPES[draggedNode.type];
+      const targetNodeType = NODE_TYPES[autoConnectTarget.type];
+      
+      if (sourceNodeType.outputs.length > 0 && targetNodeType.inputs.length > 0) {
+        const sourceOutputType = sourceNodeType.outputTypes[0];
+        const targetInputType = targetNodeType.inputTypes[0];
+        
+        if (isCompatibleConnection(sourceOutputType, targetInputType, true, false)) {
+          onNodeConnect(draggedNode.id, autoConnectTarget.id, {
+            sourcePin: 0,
+            targetPin: 0,
+            sourceType: sourceOutputType,
+            targetType: targetInputType,
+            flowType: sourceNodeType.flowType
+          });
+        }
+      }
+    }
+    
     setDraggedNode(null);
+    setAutoConnectTarget(null);
+    
     if (isDraggingConnection) {
       setIsDraggingConnection(false);
       setDraggedPin(null);
@@ -332,11 +385,19 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
     const IconComponent = nodeType.icon;
     const agentTasks = tasks[agent.id] || [];
     const activeTasks = agentTasks.filter(task => task.status === 'running' || task.status === 'processing');
+    const isSelected = selectedNode && selectedNode.id === agent.id;
+    const isAutoConnectTarget = autoConnectTarget && autoConnectTarget.id === agent.id;
 
     return (
       <motion.div
         key={agent.id}
-        className={`absolute bg-slate-800 border-2 rounded-lg p-4 min-w-[200px] cursor-move ${getStatusColor(agent.status)}`}
+        className={`absolute bg-slate-800 border-2 rounded-lg p-4 min-w-[200px] cursor-move transition-all duration-200 ${
+          getStatusColor(agent.status)
+        } ${
+          isSelected ? 'border-yellow-400 shadow-lg shadow-yellow-400/50' : 'border-slate-700'
+        } ${
+          isAutoConnectTarget ? 'ring-2 ring-green-400 ring-opacity-50' : ''
+        }`}
         style={{
           left: agent.position.x,
           top: agent.position.y,
@@ -392,6 +453,13 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
             )}
           </div>
         </div>
+
+        {/* Selection indicator */}
+        {isSelected && (
+          <div className="absolute -top-1 -right-1 w-4 h-4 bg-yellow-400 rounded-full flex items-center justify-center">
+            <CheckCircle size={12} className="text-black" />
+          </div>
+        )}
 
         {/* Input Pins */}
         <div className="absolute left-0 top-0 bottom-0 flex flex-col justify-center space-y-2 pointer-events-none">
@@ -465,6 +533,13 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
       {connectionError && (
         <div className="absolute top-4 left-1/2 transform -translate-x-1/2 bg-red-600 text-white px-4 py-2 rounded-lg shadow-lg z-50">
           {connectionError}
+        </div>
+      )}
+
+      {/* Auto-connect indicator */}
+      {autoConnectTarget && (
+        <div className="absolute top-16 left-1/2 transform -translate-x-1/2 bg-green-600 text-white px-4 py-2 rounded-lg shadow-lg z-50">
+          Auto-connecting to {autoConnectTarget.name}...
         </div>
       )}
 

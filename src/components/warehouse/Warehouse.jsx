@@ -93,6 +93,7 @@ export default function Warehouse() {
     }
   ]);
   
+  const [selectedNode, setSelectedNode] = useState(null);
   const [isLoading, setIsLoading] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(0.8);
@@ -208,6 +209,34 @@ export default function Warehouse() {
     console.log(`Connected node ${sourceId} to ${targetId}`, connectionData);
   };
 
+  const handleNodeDelete = (nodeToDelete) => {
+    // Remove the node
+    setAgents(prev => prev.filter(agent => agent.id !== nodeToDelete.id));
+    
+    // Remove associated tasks
+    setTasks(prev => {
+      const newTasks = { ...prev };
+      delete newTasks[nodeToDelete.id];
+      return newTasks;
+    });
+    
+    // Remove connections involving this node
+    setConnections(prev => prev.filter(conn => 
+      conn.source !== nodeToDelete.id && conn.target !== nodeToDelete.id
+    ));
+    
+    // Clear selection if the deleted node was selected
+    if (selectedNode && selectedNode.id === nodeToDelete.id) {
+      setSelectedNode(null);
+    }
+    
+    console.log(`Deleted node ${nodeToDelete.id}`);
+  };
+
+  const handleNodeSelect = (node) => {
+    setSelectedNode(node);
+  };
+
   const handleContextMenu = (e) => {
     e.preventDefault();
     const rect = workspaceRef.current.getBoundingClientRect();
@@ -217,7 +246,7 @@ export default function Warehouse() {
     });
   };
 
-  const handleNodeSelect = (node, position) => {
+  const handleNodeSelectFromLibrary = (node, position) => {
     console.log(`Selected node "${node.name}" at position:`, position);
     alert(`Added "${node.name}" to workspace!`);
   };
@@ -310,6 +339,9 @@ export default function Warehouse() {
             onAgentClick={setSelectedAgent}
             onNodeMove={handleNodeMove}
             onNodeConnect={handleNodeConnect}
+            onNodeDelete={handleNodeDelete}
+            selectedNode={selectedNode}
+            onNodeSelect={handleNodeSelect}
           />
           
           {/* Render Connections */}
@@ -359,7 +391,7 @@ export default function Warehouse() {
         isOpen={searchModal.isOpen}
         onClose={() => setSearchModal({ isOpen: false, position: { x: 0, y: 0 } })}
         position={searchModal.position}
-        onNodeSelect={handleNodeSelect}
+        onNodeSelect={handleNodeSelectFromLibrary}
       />
       {selectedAgent && (
         <AgentModal

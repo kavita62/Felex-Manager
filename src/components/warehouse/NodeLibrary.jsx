@@ -18,7 +18,9 @@ import {
   Calendar,
   ExternalLink,
   Search,
-  MessageSquare
+  MessageSquare,
+  Users,
+  Settings
 } from "lucide-react";
 
 const CATEGORIES = [
@@ -104,6 +106,13 @@ const CATEGORIES = [
         icon: List,
         description: "Gets the next task from a list.",
         color: "bg-gray-500"
+      },
+      {
+        id: "agent-selector",
+        name: "Agent Selector",
+        icon: Users,
+        description: "Select from existing agents in the app.",
+        color: "bg-orange-500"
       }
     ]
   }

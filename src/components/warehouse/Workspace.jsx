@@ -112,6 +112,14 @@ const NODE_TYPES = {
     outputs: 1,
     outputTypes: ['data'],
     flowType: 'data'
+  },
+  'agent-selector': { 
+    icon: Users, 
+    color: 'bg-orange-500', 
+    inputs: 0, 
+    outputs: 1,
+    outputTypes: ['agent'],
+    flowType: 'data'
   }
 };
 
@@ -141,7 +149,7 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
   // Simulate active connections
   useEffect(() => {
     const interval = setInterval(() => {
-      if (connections.length > 0) {
+      if (connections && connections.length > 0) {
         const randomConnection = connections[Math.floor(Math.random() * connections.length)];
         setActiveConnections(prev => {
           const newSet = new Set(prev);
@@ -191,6 +199,7 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
       case 'status': return 'bg-green-500';
       case 'result': return 'bg-yellow-500';
       case 'approval': return 'bg-cyan-500';
+      case 'agent': return 'bg-orange-500';
       default: return 'bg-gray-500';
     }
   };
@@ -204,6 +213,7 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
     if (sourceType === targetType) return true;
     if (targetType === 'data') return true; // Data accepts any type
     if (sourceType === 'trigger') return true; // Trigger can start any flow
+    if (sourceType === 'agent' && targetType === 'data') return true; // Agent can connect to data
     
     return false;
   };
@@ -216,8 +226,19 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
         strokeDasharray: '5,5'
       };
     } else {
+      const colorMap = {
+        'trigger': '#f97316',
+        'data': '#3b82f6',
+        'text': '#a855f7',
+        'image': '#ec4899',
+        'video': '#ef4444',
+        'status': '#22c55e',
+        'result': '#eab308',
+        'approval': '#06b6d4',
+        'agent': '#f97316'
+      };
       return {
-        stroke: getPinColor(dataType).replace('bg-', '#'),
+        stroke: colorMap[dataType] || '#6b7280',
         strokeWidth: 3
       };
     }
@@ -405,6 +426,8 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
   };
 
   const renderExistingConnections = () => {
+    if (!connections || connections.length === 0) return null;
+    
     return connections.map(connection => {
       const sourceAgent = agents.find(a => a.id === connection.source);
       const targetAgent = agents.find(a => a.id === connection.target);
@@ -482,8 +505,8 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
     const isAutoConnectTarget = autoConnectTarget && autoConnectTarget.id === agent.id;
 
     // Check if this node has connections
-    const hasInputConnections = connections.some(conn => conn.target === agent.id);
-    const hasOutputConnections = connections.some(conn => conn.source === agent.id);
+    const hasInputConnections = connections && connections.some(conn => conn.target === agent.id);
+    const hasOutputConnections = connections && connections.some(conn => conn.source === agent.id);
 
     return (
       <motion.div
@@ -575,7 +598,7 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
             const inputType = nodeType.inputTypes[i];
             const isHovered = hoveredPin && hoveredPin.nodeId === agent.id && hoveredPin.pinIndex === i && !hoveredPin.isOutput;
             const isValidTarget = hoveredPin && hoveredPin.isValid;
-            const isConnected = connections.some(conn => conn.target === agent.id && conn.targetPin === i);
+            const isConnected = connections && connections.some(conn => conn.target === agent.id && conn.targetPin === i);
             
             return (
               <div
@@ -601,7 +624,7 @@ export default function Workspace({ agents, tasks, pan, zoom, onToggleStatus, on
           {Array.from({ length: nodeType.outputs }, (_, i) => {
             const outputType = nodeType.outputTypes[i];
             const isHovered = hoveredPin && hoveredPin.nodeId === agent.id && hoveredPin.pinIndex === i && hoveredPin.isOutput;
-            const isConnected = connections.some(conn => conn.source === agent.id && conn.sourcePin === i);
+            const isConnected = connections && connections.some(conn => conn.source === agent.id && conn.sourcePin === i);
             
             return (
               <div

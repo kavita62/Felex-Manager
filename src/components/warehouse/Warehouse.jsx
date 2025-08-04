@@ -199,12 +199,24 @@ export default function Warehouse() {
   };
 
   const handleNodeConnect = (sourceId, targetId, connectionData) => {
+    // Check if connection already exists
+    const existingConnection = connections.find(conn => 
+      conn.source === sourceId && conn.target === targetId &&
+      conn.sourcePin === connectionData.sourcePin && conn.targetPin === connectionData.targetPin
+    );
+
+    if (existingConnection) {
+      console.log('Connection already exists');
+      return;
+    }
+
     const newConnection = {
       id: Date.now(),
       source: sourceId,
       target: targetId,
       ...connectionData
     };
+    
     setConnections(prev => [...prev, newConnection]);
     console.log(`Connected node ${sourceId} to ${targetId}`, connectionData);
   };
@@ -299,7 +311,8 @@ export default function Warehouse() {
         'video': '#ef4444',
         'status': '#22c55e',
         'result': '#eab308',
-        'approval': '#06b6d4'
+        'approval': '#06b6d4',
+        'agent': '#f97316'
       };
       return {
         stroke: colorMap[sourceType] || '#6b7280',

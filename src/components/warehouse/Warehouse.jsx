@@ -11,83 +11,70 @@ export default function Warehouse() {
   const [agents, setAgents] = useState([
     {
       id: 1,
-      name: 'Content Creator Agent',
-      type: 'content',
-      status: 'active',
-      progress: 75,
-      task: 'Generating Instagram post',
-      memory: 'High',
-      rules: ['Creative', 'Brand Consistent'],
-      lastActivity: '2 minutes ago',
-      performance: 92,
+      name: "On Trigger",
+      type: "on-trigger",
+      status: "idle",
+      progress: 0,
+      task: "",
+      memory: "Medium",
+      rules: [],
+      lastActivity: "2 min ago",
+      performance: 85,
       is_active: true,
-      created_at: '2024-01-15T10:00:00Z'
+      created_at: "2024-01-15T10:00:00Z",
+      position: { x: 100, y: 100 }
     },
     {
       id: 2,
-      name: 'Video Editor Agent',
-      type: 'video',
-      status: 'idle',
-      progress: 0,
-      task: 'Waiting for input',
-      memory: 'Medium',
-      rules: ['Quality Focus', 'Fast Processing'],
-      lastActivity: '5 minutes ago',
-      performance: 88,
-      is_active: false,
-      created_at: '2024-01-14T15:30:00Z'
+      name: "Generate Text",
+      type: "generate-text",
+      status: "running",
+      progress: 45,
+      task: "Creating blog post",
+      memory: "High",
+      rules: [],
+      lastActivity: "now",
+      performance: 92,
+      is_active: true,
+      created_at: "2024-01-15T10:05:00Z",
+      position: { x: 400, y: 100 }
     },
     {
       id: 3,
-      name: 'Analytics Agent',
-      type: 'analytics',
-      status: 'processing',
-      progress: 45,
-      task: 'Analyzing engagement data',
-      memory: 'High',
-      rules: ['Data Driven', 'Real-time'],
-      lastActivity: '1 minute ago',
-      performance: 95,
+      name: "Send for Approval",
+      type: "send-for-approval",
+      status: "success",
+      progress: 100,
+      task: "Content approved",
+      memory: "Low",
+      rules: [],
+      lastActivity: "1 min ago",
+      performance: 78,
       is_active: true,
-      created_at: '2024-01-13T09:15:00Z'
-    },
-    {
-      id: 4,
-      name: 'Social Media Agent',
-      type: 'social',
-      status: 'error',
-      progress: 30,
-      task: 'Connection timeout',
-      memory: 'Low',
-      rules: ['Platform Aware', 'Scheduling'],
-      lastActivity: '10 minutes ago',
-      performance: 65,
-      is_active: false,
-      created_at: '2024-01-12T14:20:00Z'
+      created_at: "2024-01-15T10:10:00Z",
+      position: { x: 700, y: 100 }
     }
   ]);
-
+  
   const [tasks, setTasks] = useState({
     1: [
-      { id: 1, name: 'Generate Post Content', status: 'running', progress: 60, description: 'Criando conteúdo para Instagram', last_run: '2024-01-15T10:30:00Z' },
-      { id: 2, name: 'Optimize Hashtags', status: 'success', progress: 100, description: 'Hashtags otimizados', last_run: '2024-01-15T10:25:00Z' },
-      { id: 3, name: 'Schedule Post', status: 'idle', progress: 0, description: 'Aguardando aprovação', last_run: null }
+      { id: 1, name: "Trigger workflow", status: "success", last_run: "2024-01-15T10:00:00Z" }
     ],
     2: [
-      { id: 4, name: 'Process Video', status: 'idle', progress: 0, description: 'Aguardando arquivo', last_run: null },
-      { id: 5, name: 'Apply Effects', status: 'idle', progress: 0, description: 'Efeitos pendentes', last_run: null }
+      { id: 2, name: "Generate blog content", status: "running", last_run: "2024-01-15T10:05:00Z" },
+      { id: 3, name: "Format text", status: "queued", last_run: null }
     ],
     3: [
-      { id: 6, name: 'Collect Data', status: 'running', progress: 80, description: 'Coletando métricas', last_run: '2024-01-15T10:28:00Z' },
-      { id: 7, name: 'Analyze Trends', status: 'processing', progress: 45, description: 'Analisando tendências', last_run: '2024-01-15T10:29:00Z' },
-      { id: 8, name: 'Generate Report', status: 'idle', progress: 0, description: 'Relatório pendente', last_run: null }
-    ],
-    4: [
-      { id: 9, name: 'Connect to API', status: 'error', progress: 30, description: 'Timeout na conexão', last_run: '2024-01-15T10:20:00Z' },
-      { id: 10, name: 'Sync Posts', status: 'error', progress: 0, description: 'Falha na sincronização', last_run: '2024-01-15T10:15:00Z' }
+      { id: 4, name: "Send to reviewer", status: "success", last_run: "2024-01-15T10:08:00Z" },
+      { id: 5, name: "Wait for approval", status: "success", last_run: "2024-01-15T10:09:00Z" }
     ]
   });
-
+  
+  const [connections, setConnections] = useState([
+    { id: 1, source: 1, target: 2 },
+    { id: 2, source: 2, target: 3 }
+  ]);
+  
   const [isLoading, setIsLoading] = useState(false);
   const [pan, setPan] = useState({ x: 0, y: 0 });
   const [zoom, setZoom] = useState(0.8);
@@ -102,24 +89,20 @@ export default function Warehouse() {
       setTasks(currentTasks => {
         const newTasks = JSON.parse(JSON.stringify(currentTasks));
         const agentIds = Object.keys(newTasks);
+        
         if (agentIds.length === 0) return currentTasks;
-
+        
         const randomAgentId = agentIds[Math.floor(Math.random() * agentIds.length)];
         const agentTasks = newTasks[randomAgentId];
+        
         if (!agentTasks || agentTasks.length === 0) return currentTasks;
         
         const randomTaskIndex = Math.floor(Math.random() * agentTasks.length);
-        const statuses = ["idle", "running", "success", "error", "processing"];
+        const statuses = ["idle", "running", "success", "error", "queued"];
         const newStatus = statuses[Math.floor(Math.random() * statuses.length)];
-
+        
         newTasks[randomAgentId][randomTaskIndex].status = newStatus;
         newTasks[randomAgentId][randomTaskIndex].last_run = new Date().toISOString();
-        
-        // Update progress for running tasks
-        if (newStatus === 'running' || newStatus === 'processing') {
-          const currentProgress = newTasks[randomAgentId][randomTaskIndex].progress || 0;
-          newTasks[randomAgentId][randomTaskIndex].progress = Math.min(currentProgress + Math.random() * 10, 100);
-        }
         
         return newTasks;
       });
@@ -129,18 +112,18 @@ export default function Warehouse() {
   }, []);
 
   const handleToggleAgentStatus = async (agentToToggle) => {
-    try {
-      setAgents(prevAgents => prevAgents.map(agent => 
-        agent.id === agentToToggle.id ? { ...agent, is_active: !agent.is_active } : agent
-      ));
-    } catch (error) {
-      console.error("Error toggling agent status:", error);
-    }
+    setAgents(prevAgents => 
+      prevAgents.map(agent => 
+        agent.id === agentToToggle.id 
+          ? { ...agent, is_active: !agent.is_active }
+          : agent
+      )
+    );
   };
-  
+
   const handleGenerateReport = async () => {
     console.log("Generating report...");
-    alert("Relatório gerado e salvo!");
+    alert("Report generated and saved!");
   };
 
   const handleDragOver = (event) => {
@@ -154,14 +137,14 @@ export default function Warehouse() {
     const nodeName = event.dataTransfer.getData('application/node-name');
 
     if (nodeType) {
-      // Crie um novo ID único
+      // Create unique ID
       const newId = Date.now();
-      // Posição baseada no local do drop
+      // Position based on drop location
       const rect = workspaceRef.current.getBoundingClientRect();
       const x = (event.clientX - rect.left - pan.x) / zoom;
       const y = (event.clientY - rect.top - pan.y) / zoom;
 
-      // Crie o novo agente
+      // Create new agent
       const newAgent = {
         id: newId,
         name: nodeName,
@@ -171,7 +154,7 @@ export default function Warehouse() {
         task: '',
         memory: 'Medium',
         rules: [],
-        lastActivity: 'agora',
+        lastActivity: 'now',
         performance: 80,
         is_active: true,
         created_at: new Date().toISOString(),
@@ -186,24 +169,42 @@ export default function Warehouse() {
     }
   };
 
+  const handleNodeMove = (nodeId, newPosition) => {
+    setAgents(prev => 
+      prev.map(agent => 
+        agent.id === nodeId 
+          ? { ...agent, position: newPosition }
+          : agent
+      )
+    );
+  };
+
+  const handleNodeConnect = (sourceId, targetId) => {
+    const newConnection = {
+      id: Date.now(),
+      source: sourceId,
+      target: targetId
+    };
+    setConnections(prev => [...prev, newConnection]);
+    console.log(`Connected node ${sourceId} to ${targetId}`);
+  };
+
   const handleContextMenu = (e) => {
     e.preventDefault();
     const rect = workspaceRef.current.getBoundingClientRect();
     setSearchModal({
       isOpen: true,
-      position: {
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top
-      }
+      position: { x: e.clientX - rect.left, y: e.clientY - rect.top }
     });
   };
 
   const handleNodeSelect = (node, position) => {
     console.log(`Selected node "${node.name}" at position:`, position);
-    alert(`Agente "${node.name}" adicionado ao workspace!`);
+    alert(`Added "${node.name}" to workspace!`);
   };
 
   const handleMouseDown = (e) => {
+    // Don't start panning if right-clicking (for context menu)
     if (e.button === 2 || e.target !== e.currentTarget) return;
     setIsPanning(true);
     workspaceRef.current.style.cursor = 'grabbing';
@@ -217,7 +218,10 @@ export default function Warehouse() {
   const handleMouseMove = (e) => {
     if (!isPanning) return;
     e.preventDefault();
-    setPan(prev => ({ x: prev.x + e.movementX, y: prev.y + e.movementY }));
+    setPan(prev => ({
+      x: prev.x + e.movementX,
+      y: prev.y + e.movementY
+    }));
   };
 
   const handleWheel = (e) => {
@@ -227,17 +231,19 @@ export default function Warehouse() {
   };
 
   const fitToScreen = () => {
-    setZoom(0.8);
-    setPan({x: 100, y: 50});
+    setZoom(0.7);
+    setPan({ x: 100, y: 50 });
   };
-  
+
   return (
     <div className="h-screen w-full flex flex-col overflow-hidden bg-gradient-to-br from-slate-900 via-slate-800 to-indigo-900 text-white">
-      <TopBar agents={agents} onGenerateReport={handleGenerateReport} onFitToScreen={fitToScreen} />
-
+      <TopBar 
+        agents={agents} 
+        onGenerateReport={handleGenerateReport} 
+        onFitToScreen={fitToScreen} 
+      />
       <div className="flex-grow flex overflow-hidden">
         <NodeLibrary />
-
         <div
           ref={workspaceRef}
           className="flex-grow overflow-hidden relative cursor-grab bg-[radial-gradient(#2e3c51_1px,transparent_1px)] [background-size:32px_32px]"
@@ -257,17 +263,50 @@ export default function Warehouse() {
             zoom={zoom} 
             onToggleStatus={handleToggleAgentStatus}
             onAgentClick={setSelectedAgent}
+            onNodeMove={handleNodeMove}
+            onNodeConnect={handleNodeConnect}
           />
+          
+          {/* Render Connections */}
+          <svg className="absolute inset-0 pointer-events-none" style={{ zIndex: 500 }}>
+            <defs>
+              <marker id="arrowhead" markerWidth="10" markerHeight="7" refX="9" refY="3.5" orient="auto">
+                <polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6" />
+              </marker>
+            </defs>
+            {connections.map(connection => {
+              const sourceAgent = agents.find(a => a.id === connection.source);
+              const targetAgent = agents.find(a => a.id === connection.target);
+              
+              if (!sourceAgent || !targetAgent) return null;
+              
+              const startX = sourceAgent.position.x + 200;
+              const startY = sourceAgent.position.y + 50;
+              const endX = targetAgent.position.x;
+              const endY = targetAgent.position.y + 50;
+              
+              return (
+                <line
+                  key={connection.id}
+                  x1={startX}
+                  y1={startY}
+                  x2={endX}
+                  y2={endY}
+                  stroke="#3b82f6"
+                  strokeWidth="2"
+                  markerEnd="url(#arrowhead)"
+                />
+              );
+            })}
+          </svg>
         </div>
       </div>
-
       <SearchModal
         isOpen={searchModal.isOpen}
         onClose={() => setSearchModal({ isOpen: false, position: { x: 0, y: 0 } })}
         position={searchModal.position}
         onNodeSelect={handleNodeSelect}
       />
-
       {selectedAgent && (
         <AgentModal
           agent={selectedAgent}

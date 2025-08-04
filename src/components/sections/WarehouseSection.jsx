@@ -18,6 +18,8 @@ import {
     Loader2,
     X
 } from 'lucide-react';
+import React, { useState } from "react";
+import ReactFlow, { ReactFlowProvider } from "react-flow-renderer";
 
 const WarehouseSection = () => {
     const [agents, setAgents] = useState([
@@ -116,6 +118,89 @@ const WarehouseSection = () => {
                 : agent
         ));
     };
+
+    // [INÍCIO NOVO VIEWPORT DE AGENTES DE IA]
+    // Componente AgentOffice (definido abaixo ou em outro arquivo futuramente)
+    const agents = [
+      { id: "agent-001", position: { x: 100, y: 200 } },
+      { id: "agent-002", position: { x: 800, y: 300 } },
+      // ...adicione mais agentes conforme necessário
+    ];
+
+    function AgentOffice({ id }) {
+      // Hook de status em tempo real (definido abaixo ou em src/hooks/useAgentStatus.js)
+      const { status, tasks, metrics } = useAgentStatus(id);
+      return (
+        <div className="rounded-2xl shadow-md bg-white p-4 min-w-[300px]">
+          <div className="flex items-center mb-2">
+            <img src="/avatar.png" alt="avatar" className="w-8 h-8 rounded-full mr-2" />
+            <h2 className="text-lg font-bold">{id}</h2>
+            <span className={`ml-2 w-3 h-3 rounded-full ${status === "running" ? "bg-yellow-400 animate-pulse" : status === "success" ? "bg-green-500" : status === "error" ? "bg-red-500" : "bg-gray-300"}`}></span>
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            {tasks.map(task => (
+              <NodeCard key={task.name} name={task.name} status={task.status} />
+            ))}
+          </div>
+          <div className="mt-2 text-xs text-gray-500">
+            CPU: {metrics.cpu} | Mem: {metrics.memory} | Última: {metrics.lastRun}
+          </div>
+        </div>
+      );
+    }
+
+    // Card de tarefa do agente
+    function NodeCard({ name, status }) {
+      return (
+        <div className={`rounded-xl p-2 shadow ${status === "running" ? "bg-yellow-400 animate-pulse" : status === "success" ? "bg-green-500" : status === "error" ? "bg-red-500" : "bg-gray-300"}`}>
+          <span>{name}</span>
+        </div>
+      );
+    }
+
+    // Hook de status em tempo real (pode ser movido para src/hooks/useAgentStatus.js)
+    function useAgentStatus(agentId) {
+      const [status, setStatus] = React.useState("idle");
+      const [tasks, setTasks] = React.useState([]);
+      const [metrics, setMetrics] = React.useState({ cpu: 0, memory: 0, lastRun: "" });
+
+      React.useEffect(() => {
+        const socket = new window.WebSocket("wss://api.mywarehouse.ai/agents");
+        socket.onmessage = (event) => {
+          const update = JSON.parse(event.data);
+          if (update.agentId === agentId) {
+            setStatus(update.status);
+            setTasks(update.tasks);
+            setMetrics(update.metrics);
+          }
+        };
+        return () => socket.close();
+      }, [agentId]);
+
+      return { status, tasks, metrics };
+    }
+
+    // Viewport principal
+    function AIWarehouseViewport() {
+      return (
+        <ReactFlowProvider>
+          <div style={{ width: "100vw", height: "100vh" }}>
+            <ReactFlow
+              elements={agents.map(agent => ({
+                id: agent.id,
+                type: "default",
+                position: agent.position,
+                data: { label: <AgentOffice id={agent.id} /> }
+              }))}
+              zoomOnScroll
+              panOnScroll
+              snapToGrid
+            />
+          </div>
+        </ReactFlowProvider>
+      );
+    }
+    // [FIM NOVO VIEWPORT DE AGENTES DE IA]
 
     return (
         <div className="h-full bg-gray-900 text-white p-6">
